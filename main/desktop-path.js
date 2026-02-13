@@ -3,8 +3,8 @@ const path = require('path');
 const { execSync } = require('child_process');
 
 /**
- * OS별 바탕화면 경로 탐지
- * Windows: PowerShell로 정확한 경로 탐지 (OneDrive 등 대응)
+ * Detect desktop path per OS
+ * Windows: Accurate path detection via PowerShell (handles OneDrive, etc.)
  * macOS: ~/Desktop
  */
 function getDesktopPath() {
@@ -18,10 +18,10 @@ function getDesktopPath() {
       ).trim();
       if (result && result.length > 0) return result;
     } catch {
-      // PowerShell 실패 시 폴백
+      // Fallback on PowerShell failure
     }
 
-    // 환경 변수 기반 폴백
+    // Environment variable based fallback
     const userProfile = process.env.USERPROFILE || os.homedir();
     return path.join(userProfile, 'Desktop');
   }

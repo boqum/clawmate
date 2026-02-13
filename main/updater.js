@@ -1,48 +1,48 @@
 /**
- * ClawMate 자동 업데이트 모듈
+ * ClawMate Auto-Update Module
  *
- * electron-updater를 사용하여 GitHub Releases에서
- * 새 버전이 있으면 자동으로 다운로드하고, 앱 종료 시 설치한다.
- * 개발 모드(app.isPackaged === false)에서는 동작하지 않는다.
+ * Uses electron-updater to automatically download new versions
+ * from GitHub Releases and install on app quit.
+ * Does not run in development mode (app.isPackaged === false).
  */
 const { app } = require('electron');
 const { autoUpdater } = require('electron-updater');
 
 function checkForUpdates() {
-  // 빌드된 앱에서만 동작 (개발 모드 제외)
+  // Only runs in packaged app (excludes dev mode)
   if (!app.isPackaged) return;
 
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
 
   autoUpdater.on('checking-for-update', () => {
-    console.log('[업데이트] 새 버전 확인 중...');
+    console.log('[Update] Checking for new version...');
   });
 
   autoUpdater.on('update-available', (info) => {
-    console.log('[업데이트] 새 버전 발견:', info.version);
+    console.log('[Update] New version found:', info.version);
   });
 
   autoUpdater.on('update-not-available', () => {
-    console.log('[업데이트] 현재 최신 버전입니다.');
+    console.log('[Update] Already up to date.');
   });
 
   autoUpdater.on('download-progress', (progress) => {
-    console.log(`[업데이트] 다운로드 진행: ${Math.round(progress.percent)}%`);
+    console.log(`[Update] Download progress: ${Math.round(progress.percent)}%`);
   });
 
   autoUpdater.on('update-downloaded', (info) => {
-    console.log('[업데이트] 다운로드 완료, 재시작 시 설치됨:', info.version);
+    console.log('[Update] Download complete, will install on restart:', info.version);
   });
 
   autoUpdater.on('error', (err) => {
-    console.error('[업데이트] 오류:', err.message);
+    console.error('[Update] Error:', err.message);
   });
 
-  // 최초 업데이트 확인
+  // Initial update check
   autoUpdater.checkForUpdatesAndNotify();
 
-  // 6시간마다 업데이트 확인
+  // Check for updates every 6 hours
   setInterval(() => {
     autoUpdater.checkForUpdatesAndNotify();
   }, 6 * 60 * 60 * 1000);

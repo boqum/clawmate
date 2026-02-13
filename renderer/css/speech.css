@@ -1,4 +1,4 @@
-/* 말풍선 공통 */
+/* Speech bubble common styles */
 .speech-bubble {
   position: absolute;
   padding: 8px 14px;
@@ -25,7 +25,7 @@
   border-right: 8px solid transparent;
 }
 
-/* Pet 모드 말풍선 — 둥글고 빨간 테두리 */
+/* Pet mode speech bubble -- rounded with red border */
 .speech-pet {
   background: #fff5f5;
   border: 2px solid #ff4f40;
@@ -38,7 +38,7 @@
   border-top: 8px solid #ff4f40;
 }
 
-/* Incarnation 모드 말풍선 — 각지고 틸 발광 */
+/* Incarnation mode speech bubble -- angular with teal glow */
 .speech-incarnation {
   background: #f0fffd;
   border: 2px solid #00BFA5;
@@ -51,12 +51,12 @@
   border-top: 8px solid #00BFA5;
 }
 
-/* 타자기 커서 효과 */
+/* Typewriter cursor effect */
 .speech-text {
   display: inline;
 }
 
-/* 페이드 아웃 */
+/* Fade out */
 .speech-fade {
   animation: speech-disappear 0.5s ease-in forwards;
 }

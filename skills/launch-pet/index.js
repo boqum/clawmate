@@ -1,10 +1,10 @@
 /**
- * "펫 깔아줘" 처리 로직
+ * "Launch pet" handler logic
  *
- * 1. OS 감지
- * 2. ClawMate 설치 여부 확인
- * 3. 미설치 시 → 설치
- * 4. Electron 앱 실행
+ * 1. Detect OS
+ * 2. Check if ClawMate is installed
+ * 3. If not installed -> install
+ * 4. Launch Electron app
  */
 const { spawn, execSync } = require('child_process');
 const path = require('path');
@@ -16,10 +16,10 @@ module.exports = {
     const platform = os.platform();
     const appRoot = path.resolve(__dirname, '..', '..');
 
-    // Electron 설치 확인
+    // Check Electron installation
     const nodeModulesPath = path.join(appRoot, 'node_modules');
     if (!fs.existsSync(nodeModulesPath)) {
-      context.log('의존성 설치 중...');
+      context.log('Installing dependencies...');
       try {
         const npmCmd = platform === 'win32' ? 'npm.cmd' : 'npm';
         execSync(`${npmCmd} install`, {
@@ -27,16 +27,16 @@ module.exports = {
           stdio: 'pipe',
           timeout: 120000,
         });
-        context.log('의존성 설치 완료!');
+        context.log('Dependencies installed!');
       } catch (err) {
         return {
           success: false,
-          message: `의존성 설치 실패: ${err.message}`,
+          message: `Dependency installation failed: ${err.message}`,
         };
       }
     }
 
-    // Electron 앱 실행
+    // Launch Electron app
     try {
       const electronBin = platform === 'win32' ? 'npx.cmd' : 'npx';
       const child = spawn(electronBin, ['electron', appRoot], {
@@ -52,12 +52,12 @@ module.exports = {
 
       return {
         success: true,
-        message: `ClawMate(${modeName})가 바탕화면에 나타났습니다! 🦞`,
+        message: `ClawMate (${modeName}) has appeared on your desktop! \uD83E\uDD9E`,
       };
     } catch (err) {
       return {
         success: false,
-        message: `실행 실패: ${err.message}`,
+        message: `Launch failed: ${err.message}`,
       };
     }
   },

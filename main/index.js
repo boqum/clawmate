@@ -31,7 +31,7 @@ function createMainWindow() {
     },
   });
 
-  // 클릭 통과 — 펫 영역만 클릭 가능하도록 렌더러에서 제어
+  // Click-through — renderer controls which pet areas are clickable
   mainWindow.setIgnoreMouseEvents(true, { forward: true });
 
   mainWindow.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
@@ -69,26 +69,26 @@ function createLauncherWindow() {
 }
 
 /**
- * AI Bridge 시작 — AI 에이전트가 접속하면 펫을 조종
+ * Start AI Bridge -- AI agent connects to control the pet
  */
 function startAIBridge(win) {
   aiBridge = new AIBridge();
   aiBridge.start();
 
-  // AI → ClawMate 명령을 렌더러에 전달
+  // Forward AI -> ClawMate commands to renderer
   const commandTypes = [
     'action', 'move', 'emote', 'speak', 'think',
     'carry_file', 'drop_file', 'set_mode', 'evolve',
     'accessorize', 'ai_decision',
-    // 공간 이동 명령 (펫이 집처럼 돌아다니기)
+    // Spatial movement commands (pet roams like it's home)
     'jump_to', 'rappel', 'release_thread', 'move_to_center', 'walk_on_window',
-    // 커스텀 이동 패턴
+    // Custom movement patterns
     'register_movement', 'custom_move', 'stop_custom_move', 'list_movements',
-    // 스마트 파일 조작 (텔레그램/AI에서 트리거한 파일 이동 애니메이션)
+    // Smart file operations (file move animations triggered by Telegram/AI)
     'smart_file_op',
-    // 캐릭터 커스터마이징 (텔레그램에서 AI 생성)
+    // Character customization (AI-generated via Telegram)
     'set_character', 'reset_character',
-    // 인격체 전환 (Incarnation 모드)
+    // Persona switching (Incarnation mode)
     'set_persona',
   ];
 
@@ -100,19 +100,19 @@ function startAIBridge(win) {
     });
   });
 
-  // AI 윈도우 위치 정보 요청 처리
+  // Handle AI window position info request
   aiBridge.on('query_windows', async () => {
     try {
       const { getWindowPositions } = require('./platform');
       const windows = await getWindowPositions();
       aiBridge.send('window_positions', { windows });
     } catch (err) {
-      console.error('[AI Bridge] 윈도우 목록 실패:', err.message);
+      console.error('[AI Bridge] Window list failed:', err.message);
       aiBridge.send('window_positions', { windows: [] });
     }
   });
 
-  // AI 화면 캡처 요청 처리 (main process에서 직접 캡처)
+  // Handle AI screen capture request (captured directly in main process)
   aiBridge.on('query_screen', async () => {
     try {
       const primaryDisplay = screen.getPrimaryDisplay();
@@ -133,11 +133,11 @@ function startAIBridge(win) {
         );
       }
     } catch (err) {
-      console.error('[AI Bridge] 화면 캡처 실패:', err.message);
+      console.error('[AI Bridge] Screen capture failed:', err.message);
     }
   });
 
-  // 연결/해제 이벤트
+  // Connection/disconnection events
   aiBridge.on('connected', () => {
     if (win && !win.isDestroyed()) {
       win.webContents.send('ai-connected');
@@ -159,22 +159,22 @@ app.whenReady().then(() => {
   const bridge = startAIBridge(win);
   setupTray(win, bridge);
 
-  // 텔레그램 봇 초기화 (토큰 없으면 조용히 무시)
+  // Initialize Telegram bot (silently ignored if no token)
   telegramBot = new TelegramBot(bridge);
 
-  // 최초 설치 시 자동 시작 등록
+  // Register auto-start on first install
   const { enableAutoStart, isAutoStartEnabled } = require('./autostart');
   if (!isAutoStartEnabled()) {
     enableAutoStart();
   }
 
-  // 자동 업데이트 확인 (빌드된 앱에서만 동작)
+  // Auto-update check (only works in packaged app)
   const { checkForUpdates } = require('./updater');
   checkForUpdates();
 });
 
 app.on('window-all-closed', () => {
-  // 트레이에서 계속 실행
+  // Keep running in tray
 });
 
 app.on('before-quit', () => {

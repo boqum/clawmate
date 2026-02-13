@@ -1,8 +1,8 @@
 /**
- * 마우스/클릭/드래그 상호작용 시스템
+ * Mouse/click/drag interaction system
  *
- * AI 연결 시: 이벤트를 AI에 전달 → AI가 반응 결정
- * AI 미연결 시: 자율 반응 (랜덤 FSM)
+ * When AI connected: Events forwarded to AI -> AI decides reactions
+ * When AI disconnected: Autonomous reactions (random FSM)
  */
 const Interactions = (() => {
   let isDragging = false;
@@ -76,7 +76,7 @@ const Interactions = (() => {
 
     const endPos = PetEngine.getPosition();
 
-    // 화면 가장자리까지의 거리 계산
+    // Calculate distance to screen edges
     const screenW = window.innerWidth;
     const screenH = window.innerHeight;
     const charSize = PetEngine.CHAR_SIZE;
@@ -86,15 +86,15 @@ const Interactions = (() => {
     const distRight = screenW - charSize - endPos.x;
     const minEdgeDist = Math.min(distBottom, distTop, distLeft, distRight);
 
-    // 가장자리에서 충분히 떨어져 있으면 (화면 중앙 근처) → 낙하
-    // 가장자리 근처 임계값: 화면 짧은 변의 15%
+    // If far enough from edges (near screen center) -> free fall
+    // Edge proximity threshold: 15% of the shorter screen dimension
     const edgeThreshold = Math.min(screenW, screenH) * 0.15;
 
     if (minEdgeDist > edgeThreshold) {
-      // 화면 중앙 근처: 중력 낙하로 바닥까지 떨어짐
+      // Near screen center: gravity fall to the floor
       PetEngine.startFalling();
     } else {
-      // 가장자리 근처: 기존대로 가장 가까운 가장자리에 붙음
+      // Near edge: snap to the nearest edge as before
       PetEngine.snapToNearestEdge();
       StateMachine.forceState('idle');
     }
@@ -102,7 +102,7 @@ const Interactions = (() => {
     PetEngine.start();
     window.clawmate.setClickThrough(true);
 
-    // AI에 드래그 이벤트 리포트 + 반응 기록
+    // Report drag event to AI + record reaction
     if (dragStartPos) {
       const draggedAction = StateMachine.getState();
       Memory.recordReaction(draggedAction, 'drag');
@@ -114,14 +114,14 @@ const Interactions = (() => {
     const pos = PetEngine.getPosition();
     const currentAction = StateMachine.getState();
 
-    // AI에 클릭 이벤트 리포트
+    // Report click event to AI
     AIController.reportClick(pos);
 
-    // 유저 반응 기록 — 현재 행동 중 클릭 = 긍정 반응
+    // Record user reaction -- click during current action = positive reaction
     Memory.recordReaction(currentAction, 'click');
 
-    // AI 연결 시: AI가 반응 결정 (아무것도 안 함, AI 응답 대기)
-    // AI 미연결 시: 자율 반응
+    // When AI connected: AI decides reaction (do nothing, wait for AI response)
+    // When AI disconnected: autonomous reaction
     if (AIController.isAutonomous()) {
       StateMachine.forceState('interacting');
       Speech.show(Speech.getReactionMessage());
@@ -135,26 +135,26 @@ const Interactions = (() => {
     const pos = PetEngine.getPosition();
     const currentAction = StateMachine.getState();
 
-    // 유저 반응 기록
+    // Record user reaction
     Memory.recordReaction(currentAction, 'double_click');
 
-    // AI에 더블클릭 리포트
+    // Report double-click to AI
     if (window.clawmate.reportToAI) {
       window.clawmate.reportToAI('double_click', { position: pos });
     }
 
-    // 자율 모드: 더블클릭 = 특별 반응 (점프 + 기분좋음)
+    // Autonomous mode: double-click = special reaction (jump + excitement)
     if (AIController.isAutonomous()) {
       StateMachine.forceState('excited');
       PetEngine.jumpTo(
         pos.x + (Math.random() - 0.5) * 200,
         Math.max(100, pos.y - 150)
       );
-      Speech.show('우와! 더블클릭이다!');
+      Speech.show('Wow! A double-click!');
     }
 
     Memory.recordClick();
-    Memory.recordClick(); // 더블클릭 = 2회 클릭
+    Memory.recordClick(); // double-click = 2 clicks
     spawnHeartEffect();
     spawnStarEffect();
   }
@@ -178,14 +178,14 @@ const Interactions = (() => {
     const dist = Math.hypot(e.clientX - (pos.x + 32), e.clientY - (pos.y + 32));
 
     if (dist < 100) {
-      // 유저 반응 기록 — 커서 접근 = 관심 표현
+      // Record user reaction -- cursor approach = showing interest
       const curAction = StateMachine.getState();
       Memory.recordReaction(curAction, 'cursor_near');
 
-      // AI에 커서 접근 리포트
+      // Report cursor proximity to AI
       AIController.reportCursorNear(dist);
 
-      // AI 미연결 시: 자율 반응
+      // When AI disconnected: autonomous reaction
       if (AIController.isAutonomous()) {
         const state = StateMachine.getState();
         if (state === 'idle' || state === 'walking') {

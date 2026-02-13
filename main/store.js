@@ -15,7 +15,7 @@ class Store {
       const raw = fs.readFileSync(this.path, 'utf-8');
       this.data = { ...this.data, ...JSON.parse(raw) };
     } catch {
-      // 파일 없으면 기본값 사용
+      // Use defaults if file doesn't exist
     }
   }
 

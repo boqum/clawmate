@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>ClawMate - 첫 만남</title>
+  <title>ClawMate - First Meeting</title>
   <link rel="stylesheet" href="css/launcher.css">
   <style>
     .intro-text {
@@ -28,38 +28,38 @@
   <div class="launcher">
     <div class="launcher-header">
       <div class="welcome-anim">\u{1F99E}</div>
-      <h1>환영합니다!</h1>
-      <p class="subtitle">ClawMate에 오신 걸 환영해요</p>
+      <h1>Welcome!</h1>
+      <p class="subtitle">Welcome to ClawMate</p>
     </div>
 
     <div class="intro-text">
-      <p>바탕화면 위를 돌아다니며 함께하는 작은 친구를 소개합니다.</p>
-      <p>오래 함께할수록 친구의 모습이 점점 변해갈 거예요!</p>
-      <p><strong>어떤 모드로 시작할까요?</strong></p>
+      <p>Meet your little friend who roams around your desktop with you.</p>
+      <p>The longer you stay together, the more your friend will evolve!</p>
+      <p><strong>Which mode would you like to start with?</strong></p>
     </div>
 
     <div class="launcher-body">
       <div class="mode-card" id="mode-pet" onclick="selectMode('pet')">
         <div class="mode-icon">\u{1F990}</div>
         <h2>Clawby</h2>
-        <p>귀여운 동반자</p>
-        <span class="mode-desc">장난기 많고 다정한 꼬마 랍스터!</span>
+        <p>Cute companion</p>
+        <span class="mode-desc">A playful and affectionate little lobster!</span>
       </div>
 
       <div class="mode-card" id="mode-incarnation" onclick="selectMode('incarnation')">
         <div class="mode-icon">\u{1F980}</div>
         <h2>Claw</h2>
-        <p>육체를 얻은 존재</p>
-        <span class="mode-desc">침착하고 카리스마 있는 Claw!</span>
+        <p>An entity given physical form</p>
+        <span class="mode-desc">The calm and charismatic Claw!</span>
       </div>
     </div>
 
     <button class="start-btn" id="start-btn" disabled onclick="startFirstRun()">
-      모드를 선택해주세요
+      Select a mode
     </button>
 
     <p class="tip" style="text-align:center;color:#999;font-size:11px;margin-top:12px;">
-      나중에 3번 연속 클릭이나 트레이 메뉴에서 모드를 바꿀 수 있어요
+      You can change modes later with a triple-click or from the tray menu
     </p>
   </div>
 
@@ -72,7 +72,7 @@
       document.getElementById('mode-' + mode).classList.add('selected');
       const btn = document.getElementById('start-btn');
       btn.disabled = false;
-      btn.textContent = mode === 'pet' ? 'Clawby와 시작!' : 'Claw과 시작!';
+      btn.textContent = mode === 'pet' ? 'Start with Clawby!' : 'Start with Claw!';
     }
 
     async function startFirstRun() {

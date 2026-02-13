@@ -47,9 +47,9 @@ function isLinux() {
 }
 
 /**
- * OS별 열린 윈도우의 위치/크기 정보를 가져옴
- * 반환 형식: [{ id, title, x, y, width, height }]
- * 실패 시 빈 배열 반환 (안전한 폴백)
+ * Get position/size info of open windows per OS
+ * Return format: [{ id, title, x, y, width, height }]
+ * Returns empty array on failure (safe fallback)
  */
 async function getWindowPositions() {
   if (platform === 'win32') {
@@ -62,12 +62,12 @@ async function getWindowPositions() {
 }
 
 /**
- * Windows: PowerShell로 보이는 윈도우 목록 + 위치/크기 조회
- * Add-Type으로 Win32 API(GetWindowRect) 호출
+ * Windows: Get visible window list + position/size via PowerShell
+ * Calls Win32 API (GetWindowRect) via Add-Type
  */
 async function getWindowPositionsWindows() {
   try {
-    // PowerShell에서 C# 인라인 컴파일로 Win32 API 접근
+    // Access Win32 API via inline C# compilation in PowerShell
     const psScript = `
 Add-Type @"
 using System;
@@ -101,7 +101,7 @@ public class WinInfo {
 [WinInfo]::GetWindows()
 `.trim();
 
-    // PowerShell 스크립트를 임시 파일 없이 stdin으로 전달
+    // Pass PowerShell script via stdin without temp files
     const { stdout } = await execAsync(
       `powershell -NoProfile -Command -`,
       { input: psScript, timeout: 5000, encoding: 'utf-8' }
@@ -129,11 +129,11 @@ public class WinInfo {
 }
 
 /**
- * macOS: AppleScript로 보이는 윈도우 위치/크기 조회
+ * macOS: Get visible window positions/sizes via AppleScript
  */
 async function getWindowPositionsMac() {
   try {
-    // AppleScript로 보이는 프로세스의 윈도우 정보 수집
+    // Collect window info of visible processes via AppleScript
     const script = `
 tell application "System Events"
   set output to ""
@@ -180,8 +180,8 @@ end tell
 }
 
 /**
- * Linux: wmctrl -l -G 로 윈도우 위치/크기 조회
- * wmctrl 미설치 시 빈 배열 반환
+ * Linux: Get window positions/sizes via wmctrl -l -G
+ * Returns empty array if wmctrl is not installed
  */
 async function getWindowPositionsLinux() {
   try {
@@ -193,8 +193,8 @@ async function getWindowPositionsLinux() {
     const result = (stdout || '').trim();
     if (!result) return [];
 
-    // wmctrl -l -G 출력 형식:
-    // 0x02000003  0 0    0    1920 1080 hostname 데스크톱
+    // wmctrl -l -G output format:
+    // 0x02000003  0 0    0    1920 1080 hostname Desktop
     // ID          desktop x  y  width height hostname title
     return result.split('\n').filter(Boolean).map((line, i) => {
       const parts = line.trim().split(/\s+/);
@@ -203,7 +203,7 @@ async function getWindowPositionsLinux() {
       const y = parseInt(parts[3], 10) || 0;
       const width = parseInt(parts[4], 10) || 0;
       const height = parseInt(parts[5], 10) || 0;
-      // hostname 이후가 타이틀 (공백 포함 가능)
+      // Everything after hostname is the title (may contain spaces)
       const title = parts.slice(7).join(' ');
       if (width < 50 || height < 50) return null;
       return { id: `win_${i}`, title, x, y, width, height };
@@ -214,8 +214,8 @@ async function getWindowPositionsLinux() {
 }
 
 /**
- * 현재 포커스된 (최상위) 윈도우의 제목 반환
- * 브라우저 탭 제목을 감지하여 펫이 참견할 수 있게 함
+ * Return title of currently focused (foreground) window
+ * Detects browser tab titles so the pet can comment on them
  */
 async function getActiveWindowTitle() {
   try {

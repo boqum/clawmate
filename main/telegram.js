@@ -1,36 +1,36 @@
 /**
- * 텔레그램 봇 통합 모듈
+ * Telegram Bot Integration Module
  *
- * 텔레그램 메시지 ↔ ClawMate 양방향 통신.
- * - 텔레그램에서 온 메시지를 파싱하여 AI Bridge에 명령 전달
- * - 펫의 상태/말을 텔레그램으로 역전달
+ * Bidirectional communication between Telegram messages and ClawMate.
+ * - Parses incoming Telegram messages and forwards commands to AI Bridge
+ * - Relays pet state/speech back to Telegram
  *
- * 봇 토큰 우선순위:
- *   1. 환경변수 CLAWMATE_TELEGRAM_TOKEN
- *   2. 설정 파일 (Store)
- *   3. 둘 다 없으면 조용히 비활성화 (에러 없음)
+ * Bot token priority:
+ *   1. Environment variable CLAWMATE_TELEGRAM_TOKEN
+ *   2. Config file (Store)
+ *   3. If neither exists, silently disabled (no error)
  *
- * 의존성: node-telegram-bot-api (npm install node-telegram-bot-api)
+ * Dependency: node-telegram-bot-api (npm install node-telegram-bot-api)
  */
 
 const EventEmitter = require('events');
 const { parseMessage } = require('./file-command-parser');
 const { executeSmartFileOp } = require('./smart-file-ops');
 
-// 텔레그램 봇 API 동적 로드 (미설치 시 조용히 무시)
+// Dynamically load Telegram Bot API (silently ignored if not installed)
 let TelegramBotAPI = null;
 try {
   TelegramBotAPI = require('node-telegram-bot-api');
 } catch {
-  // node-telegram-bot-api 미설치 — 텔레그램 기능 비활성화
+  // node-telegram-bot-api not installed — Telegram features disabled
 }
 
 class TelegramBot extends EventEmitter {
   /**
-   * @param {object} bridge - AIBridge 인스턴스
-   * @param {object} options - 추가 옵션
-   *   - token: 봇 토큰 (환경변수보다 우선)
-   *   - allowedChatIds: 허용된 채팅 ID 목록 (보안)
+   * @param {object} bridge - AIBridge instance
+   * @param {object} options - Additional options
+   *   - token: Bot token (takes priority over env variable)
+   *   - allowedChatIds: List of allowed chat IDs (security)
    */
   constructor(bridge, options = {}) {
     super();
@@ -38,24 +38,24 @@ class TelegramBot extends EventEmitter {
     this.bot = null;
     this.active = false;
     this.allowedChatIds = options.allowedChatIds || null;
-    this.activeChatIds = new Set(); // 활성 채팅 ID 추적
+    this.activeChatIds = new Set(); // Track active chat IDs
 
-    // 진행 중인 파일 작업 추적
+    // Track in-progress file operations
     this._fileOpInProgress = false;
 
-    // 봇 토큰 결정
+    // Determine bot token
     const token = options.token
       || process.env.CLAWMATE_TELEGRAM_TOKEN
       || null;
 
     if (!token) {
-      console.log('[Telegram] 봇 토큰 없음 — 텔레그램 기능 비활성화');
+      console.log('[Telegram] No bot token — Telegram features disabled');
       return;
     }
 
     if (!TelegramBotAPI) {
-      console.log('[Telegram] node-telegram-bot-api 미설치 — 텔레그램 기능 비활성화');
-      console.log('[Telegram] 설치: npm install node-telegram-bot-api');
+      console.log('[Telegram] node-telegram-bot-api not installed — Telegram features disabled');
+      console.log('[Telegram] Install: npm install node-telegram-bot-api');
       return;
     }
 
@@ -63,46 +63,46 @@ class TelegramBot extends EventEmitter {
   }
 
   /**
-   * 봇 초기화 및 메시지 리스너 등록
+   * Initialize bot and register message listeners
    */
   _init(token) {
     try {
       this.bot = new TelegramBotAPI(token, { polling: true });
       this.active = true;
-      console.log('[Telegram] 봇 초기화 성공 — 메시지 대기 중');
+      console.log('[Telegram] Bot initialized — waiting for messages');
 
-      // 메시지 수신 핸들러
+      // Message receive handler
       this.bot.on('message', (msg) => this._handleMessage(msg));
 
-      // 에러 핸들러 (연결 끊김 등)
+      // Error handler (disconnection, etc.)
       this.bot.on('polling_error', (err) => {
-        // 토큰 오류 등 치명적 에러가 아니면 조용히 재시도
+        // Silently retry unless fatal error like invalid token
         if (err.code === 'ETELEGRAM' && err.response?.statusCode === 401) {
-          console.error('[Telegram] 봇 토큰이 유효하지 않음 — 텔레그램 비활성화');
+          console.error('[Telegram] Invalid bot token — Telegram disabled');
           this.stop();
         }
       });
 
-      // AI Bridge에서 펫 이벤트 수신 → 텔레그램으로 전달
+      // Receive pet events from AI Bridge and forward to Telegram
       this._setupBridgeListeners();
     } catch (err) {
-      console.error('[Telegram] 봇 초기화 실패:', err.message);
+      console.error('[Telegram] Bot initialization failed:', err.message);
       this.active = false;
     }
   }
 
   /**
-   * AI Bridge 이벤트 리스너 설정 (펫 → 텔레그램)
+   * Set up AI Bridge event listeners (pet -> Telegram)
    */
   _setupBridgeListeners() {
     if (!this.bridge) return;
 
-    // 펫이 말할 때 텔레그램으로 전달
+    // Forward pet speech to Telegram
     this.bridge.on('speak', (payload) => {
       this._broadcastToChats(`[Claw] ${payload.text}`);
     });
 
-    // AI 의사결정에 speech가 있으면 전달
+    // Forward speech from AI decisions
     this.bridge.on('ai_decision', (payload) => {
       if (payload.speech) {
         this._broadcastToChats(`[Claw] ${payload.speech}`);
@@ -111,7 +111,7 @@ class TelegramBot extends EventEmitter {
   }
 
   /**
-   * 텔레그램 메시지 처리
+   * Handle incoming Telegram message
    */
   async _handleMessage(msg) {
     if (!this.active) return;
@@ -119,29 +119,29 @@ class TelegramBot extends EventEmitter {
 
     const chatId = msg.chat.id;
 
-    // 보안: 허용된 채팅 ID만 처리
+    // Security: only process allowed chat IDs
     if (this.allowedChatIds && !this.allowedChatIds.includes(chatId)) {
       return;
     }
 
-    // 활성 채팅 ID 추적 (역전달용)
+    // Track active chat IDs (for broadcasting)
     this.activeChatIds.add(chatId);
 
     const text = msg.text.trim();
-    console.log(`[Telegram] 수신 (${chatId}): ${text}`);
+    console.log(`[Telegram] Received (${chatId}): ${text}`);
 
-    // 특수 명령 처리
+    // Handle special commands
     if (text === '/start') {
       await this.bot.sendMessage(chatId,
-        'ClawMate 연결됨! \n\n' +
-        '사용 가능한 명령:\n' +
-        '- 아무 메시지: 펫에게 말하기\n' +
-        '- 행동 키워드: 점프해, 잠자, 춤춰, 걸어...\n' +
-        '- 파일 정리: "바탕화면의 .md 파일을 docs 폴더에 넣어줘"\n' +
-        '- 캐릭터 변경: "파란 고양이로 바꿔줘"\n' +
-        '- /reset: 원래 캐릭터로 되돌리기\n' +
-        '- /status: 펫 상태 확인\n' +
-        '- /undo: 마지막 파일 이동 되돌리기'
+        'ClawMate connected! \n\n' +
+        'Available commands:\n' +
+        '- Any message: Talk to the pet\n' +
+        '- Action keywords: jump, sleep, dance, walk...\n' +
+        '- File organization: "Move .md files on desktop to docs folder"\n' +
+        '- Character change: "Change to blue cat"\n' +
+        '- /reset: Reset to default character\n' +
+        '- /status: Check pet status\n' +
+        '- /undo: Undo last file move'
       );
       return;
     }
@@ -158,22 +158,22 @@ class TelegramBot extends EventEmitter {
 
     if (text === '/reset') {
       this._sendToBridge('reset_character', {});
-      await this.bot.sendMessage(chatId, '원래 캐릭터로 되돌렸어!');
+      await this.bot.sendMessage(chatId, 'Reset to default character!');
       return;
     }
 
-    // 메시지 파싱 및 처리
+    // Parse and process message
     const parsed = parseMessage(text);
     await this._executeCommand(chatId, parsed);
   }
 
   /**
-   * 파싱된 명령 실행
+   * Execute parsed command
    */
   async _executeCommand(chatId, command) {
     switch (command.type) {
       case 'speak':
-        // 일반 대화 → 펫 말풍선에 표시
+        // Normal conversation -> display in pet speech bubble
         this._sendToBridge('speak', { text: command.text, style: 'normal' });
         this._sendToBridge('ai_decision', {
           speech: command.text,
@@ -182,50 +182,50 @@ class TelegramBot extends EventEmitter {
         break;
 
       case 'action':
-        // 행동 명령 → 펫 행동 변경
+        // Action command -> change pet behavior
         this._sendToBridge('action', { state: command.action });
-        await this.bot.sendMessage(chatId, `펫이 "${command.action}" 행동을 합니다!`);
+        await this.bot.sendMessage(chatId, `Pet is performing "${command.action}"!`);
         break;
 
       case 'smart_file_op':
-        // 파일 조작 명령
+        // File operation command
         await this._executeFileOp(chatId, command);
         break;
 
       case 'character_change':
-        // 캐릭터 변경 명령 → AI 생성 요청
+        // Character change command -> AI generation request
         await this._handleCharacterChange(chatId, command.concept);
         break;
 
       case 'mode_change':
-        // 모드 변경 명령
+        // Mode change command
         this._sendToBridge('set_mode', { mode: command.mode });
-        const modeNames = { pet: 'Pet (Clawby)', incarnation: 'Incarnation (Claw)', both: '둘 다' };
-        await this.bot.sendMessage(chatId, `모드 변경: ${modeNames[command.mode] || command.mode}`);
+        const modeNames = { pet: 'Pet (Clawby)', incarnation: 'Incarnation (Claw)', both: 'Both' };
+        await this.bot.sendMessage(chatId, `Mode changed: ${modeNames[command.mode] || command.mode}`);
         break;
 
       case 'preset_character': {
-        // 캐릭터 프리셋 선택
+        // Character preset selection
         const presets = {
-          default: { name: '기본 Claw', colorMap: { primary: '#ff4f40', secondary: '#ff775f', dark: '#8B4513', eye: '#ffffff', pupil: '#111111', claw: '#ff4f40' } },
-          blue: { name: '파란 Claw', colorMap: { primary: '#4488ff', secondary: '#6699ff', dark: '#223388', eye: '#ffffff', pupil: '#111111', claw: '#4488ff' } },
-          green: { name: '초록 Claw', colorMap: { primary: '#44cc44', secondary: '#66dd66', dark: '#226622', eye: '#ffffff', pupil: '#111111', claw: '#44cc44' } },
-          purple: { name: '보라 Claw', colorMap: { primary: '#8844cc', secondary: '#aa66dd', dark: '#442266', eye: '#ffffff', pupil: '#111111', claw: '#8844cc' } },
-          gold: { name: '골드 Claw', colorMap: { primary: '#ffcc00', secondary: '#ffdd44', dark: '#886600', eye: '#ffffff', pupil: '#111111', claw: '#ffcc00' } },
-          pink: { name: '핑크 Claw', colorMap: { primary: '#ff69b4', secondary: '#ff8cc4', dark: '#8B3060', eye: '#ffffff', pupil: '#111111', claw: '#ff69b4' } },
-          cat: { name: '고양이', colorMap: { primary: '#ff9944', secondary: '#ffbb66', dark: '#663300', eye: '#88ff88', pupil: '#111111', claw: '#ff9944' } },
-          robot: { name: '로봇', colorMap: { primary: '#888888', secondary: '#aaaaaa', dark: '#444444', eye: '#66aaff', pupil: '#0044aa', claw: '#66aaff' } },
-          ghost: { name: '유령', colorMap: { primary: '#ccccff', secondary: '#eeeeff', dark: '#6666aa', eye: '#ff6666', pupil: '#cc0000', claw: '#ccccff' } },
-          dragon: { name: '드래곤', colorMap: { primary: '#cc2222', secondary: '#ff4444', dark: '#661111', eye: '#ffaa00', pupil: '#111111', claw: '#ffaa00' } },
+          default: { name: 'Default Claw', colorMap: { primary: '#ff4f40', secondary: '#ff775f', dark: '#8B4513', eye: '#ffffff', pupil: '#111111', claw: '#ff4f40' } },
+          blue: { name: 'Blue Claw', colorMap: { primary: '#4488ff', secondary: '#6699ff', dark: '#223388', eye: '#ffffff', pupil: '#111111', claw: '#4488ff' } },
+          green: { name: 'Green Claw', colorMap: { primary: '#44cc44', secondary: '#66dd66', dark: '#226622', eye: '#ffffff', pupil: '#111111', claw: '#44cc44' } },
+          purple: { name: 'Purple Claw', colorMap: { primary: '#8844cc', secondary: '#aa66dd', dark: '#442266', eye: '#ffffff', pupil: '#111111', claw: '#8844cc' } },
+          gold: { name: 'Gold Claw', colorMap: { primary: '#ffcc00', secondary: '#ffdd44', dark: '#886600', eye: '#ffffff', pupil: '#111111', claw: '#ffcc00' } },
+          pink: { name: 'Pink Claw', colorMap: { primary: '#ff69b4', secondary: '#ff8cc4', dark: '#8B3060', eye: '#ffffff', pupil: '#111111', claw: '#ff69b4' } },
+          cat: { name: 'Cat', colorMap: { primary: '#ff9944', secondary: '#ffbb66', dark: '#663300', eye: '#88ff88', pupil: '#111111', claw: '#ff9944' } },
+          robot: { name: 'Robot', colorMap: { primary: '#888888', secondary: '#aaaaaa', dark: '#444444', eye: '#66aaff', pupil: '#0044aa', claw: '#66aaff' } },
+          ghost: { name: 'Ghost', colorMap: { primary: '#ccccff', secondary: '#eeeeff', dark: '#6666aa', eye: '#ff6666', pupil: '#cc0000', claw: '#ccccff' } },
+          dragon: { name: 'Dragon', colorMap: { primary: '#cc2222', secondary: '#ff4444', dark: '#661111', eye: '#ffaa00', pupil: '#111111', claw: '#ffaa00' } },
         };
         const preset = presets[command.preset];
         if (preset) {
           if (command.preset === 'default') {
             this._sendToBridge('reset_character', {});
           } else {
-            this._sendToBridge('set_character', { colorMap: preset.colorMap, speech: `${preset.name}(으)로 변신!` });
+            this._sendToBridge('set_character', { colorMap: preset.colorMap, speech: `Transforming into ${preset.name}!` });
           }
-          await this.bot.sendMessage(chatId, `캐릭터 변경: ${preset.name}`);
+          await this.bot.sendMessage(chatId, `Character changed: ${preset.name}`);
         }
         break;
       }
@@ -233,24 +233,24 @@ class TelegramBot extends EventEmitter {
   }
 
   /**
-   * 캐릭터 변경 요청 처리
+   * Handle character change request
    *
-   * 컨셉 텍스트를 AI에 전달하여
-   * 색상 + 프레임 데이터를 생성하고 펫에 적용.
+   * Passes concept text to AI to generate
+   * color + frame data and apply to pet.
    *
-   * AI가 없으면 컨셉에서 색상만 추출하여 기본 변환.
+   * Falls back to extracting colors from concept if AI is unavailable.
    */
   async _handleCharacterChange(chatId, concept) {
-    await this.bot.sendMessage(chatId, `"${concept}" 캐릭터 생성 중...`);
+    await this.bot.sendMessage(chatId, `Creating "${concept}" character...`);
 
-    // AI Bridge를 통해 AI에 캐릭터 생성 요청
+    // Request character generation from AI via AI Bridge
     this._sendToBridge('ai_decision', {
-      speech: `${concept}(으)로 변신 준비 중...`,
+      speech: `Preparing to transform into ${concept}...`,
       emotion: 'curious',
       action: 'excited',
     });
 
-    // user_event로 캐릭터 변경 요청 전달 (AI가 생성)
+    // Forward character change request via user_event (AI generates it)
     if (this.bridge) {
       this.bridge.send('user_event', {
         event: 'character_request',
@@ -259,25 +259,25 @@ class TelegramBot extends EventEmitter {
       });
     }
 
-    // 폴백: AI 응답이 3초 내에 없으면 키워드 기반 색상 변환
+    // Fallback: keyword-based color conversion if no AI response within 3 seconds
     this._characterFallbackTimer = setTimeout(() => {
       const colorMap = this._extractColorsFromConcept(concept);
       if (colorMap) {
         this._sendToBridge('set_character', {
           colorMap,
-          speech: `${concept} 변신!`,
+          speech: `Transformed into ${concept}!`,
         });
-        this.bot.sendMessage(chatId, `"${concept}" 캐릭터로 바꿨어! (색상 기반)`);
+        this.bot.sendMessage(chatId, `Changed to "${concept}" character! (color-based)`);
       }
     }, 3000);
 
-    // AI가 캐릭터를 생성하면 이 타이머를 취소
+    // Cancel this timer when AI generates the character
     this._pendingCharacterChatId = chatId;
   }
 
   /**
-   * AI가 캐릭터 생성을 완료했을 때 호출
-   * 폴백 타이머를 취소하고 텔레그램에 알림
+   * Called when AI completes character generation
+   * Cancels fallback timer and notifies Telegram
    */
   onCharacterGenerated(concept) {
     if (this._characterFallbackTimer) {
@@ -286,52 +286,52 @@ class TelegramBot extends EventEmitter {
     }
     if (this._pendingCharacterChatId) {
       this.bot?.sendMessage(this._pendingCharacterChatId,
-        `"${concept}" 캐릭터 생성 완료! AI가 만든 커스텀 캐릭터야!`);
+        `"${concept}" character created! Custom character generated by AI!`);
       this._pendingCharacterChatId = null;
     }
   }
 
   /**
-   * 컨셉 텍스트에서 색상 추출 (AI 없을 때 폴백)
-   * 키워드 매칭으로 색상 팔레트 결정
+   * Extract colors from concept text (fallback when AI unavailable)
+   * Determines color palette via keyword matching
    */
   _extractColorsFromConcept(concept) {
     const c = concept.toLowerCase();
 
-    // 색상 키워드 → 팔레트 매핑
+    // Color keyword -> palette mapping
     const colorKeywords = {
-      // 파란 계열
+      // Blue family
       '파란': { primary: '#4488ff', secondary: '#6699ff', dark: '#223388', claw: '#4488ff' },
       '파랑': { primary: '#4488ff', secondary: '#6699ff', dark: '#223388', claw: '#4488ff' },
       'blue': { primary: '#4488ff', secondary: '#6699ff', dark: '#223388', claw: '#4488ff' },
-      // 초록 계열
+      // Green family
       '초록': { primary: '#44cc44', secondary: '#66dd66', dark: '#226622', claw: '#44cc44' },
       '녹색': { primary: '#44cc44', secondary: '#66dd66', dark: '#226622', claw: '#44cc44' },
       'green': { primary: '#44cc44', secondary: '#66dd66', dark: '#226622', claw: '#44cc44' },
-      // 보라 계열
+      // Purple family
       '보라': { primary: '#8844cc', secondary: '#aa66dd', dark: '#442266', claw: '#8844cc' },
       'purple': { primary: '#8844cc', secondary: '#aa66dd', dark: '#442266', claw: '#8844cc' },
-      // 노란 계열
+      // Yellow family
       '노란': { primary: '#ffcc00', secondary: '#ffdd44', dark: '#886600', claw: '#ffcc00' },
       '금색': { primary: '#ffd700', secondary: '#ffe44d', dark: '#8B7500', claw: '#ffd700' },
       'yellow': { primary: '#ffcc00', secondary: '#ffdd44', dark: '#886600', claw: '#ffcc00' },
       'gold': { primary: '#ffd700', secondary: '#ffe44d', dark: '#8B7500', claw: '#ffd700' },
-      // 분홍 계열
+      // Pink family
       '분홍': { primary: '#ff69b4', secondary: '#ff8cc4', dark: '#8B3060', claw: '#ff69b4' },
       '핑크': { primary: '#ff69b4', secondary: '#ff8cc4', dark: '#8B3060', claw: '#ff69b4' },
       'pink': { primary: '#ff69b4', secondary: '#ff8cc4', dark: '#8B3060', claw: '#ff69b4' },
-      // 하얀 계열
+      // White family
       '하얀': { primary: '#eeeeee', secondary: '#ffffff', dark: '#999999', claw: '#dddddd' },
       '흰': { primary: '#eeeeee', secondary: '#ffffff', dark: '#999999', claw: '#dddddd' },
       'white': { primary: '#eeeeee', secondary: '#ffffff', dark: '#999999', claw: '#dddddd' },
-      // 검정 계열
+      // Black family
       '검정': { primary: '#333333', secondary: '#555555', dark: '#111111', claw: '#444444' },
       '까만': { primary: '#333333', secondary: '#555555', dark: '#111111', claw: '#444444' },
       'black': { primary: '#333333', secondary: '#555555', dark: '#111111', claw: '#444444' },
-      // 주황 계열
+      // Orange family
       '주황': { primary: '#ff8800', secondary: '#ffaa33', dark: '#884400', claw: '#ff8800' },
       'orange': { primary: '#ff8800', secondary: '#ffaa33', dark: '#884400', claw: '#ff8800' },
-      // 틸/민트 계열
+      // Teal/Mint family
       '민트': { primary: '#00BFA5', secondary: '#33D4BC', dark: '#006655', claw: '#00BFA5' },
       '틸': { primary: '#00BFA5', secondary: '#33D4BC', dark: '#006655', claw: '#00BFA5' },
       'teal': { primary: '#00BFA5', secondary: '#33D4BC', dark: '#006655', claw: '#00BFA5' },
@@ -347,7 +347,7 @@ class TelegramBot extends EventEmitter {
       }
     }
 
-    // 생물 키워드 → 특징적 색상
+    // Creature keywords -> characteristic colors
     const creatureColors = {
       '고양이': { primary: '#ff9944', secondary: '#ffbb66', dark: '#663300', claw: '#ff9944' },
       'cat': { primary: '#ff9944', secondary: '#ffbb66', dark: '#663300', claw: '#ff9944' },
@@ -381,7 +381,7 @@ class TelegramBot extends EventEmitter {
       }
     }
 
-    // 매칭 안 되면 랜덤 색상
+    // Random color if no match
     const hue = Math.floor(Math.random() * 360);
     return {
       primary: `hsl(${hue}, 70%, 55%)`,
@@ -394,11 +394,11 @@ class TelegramBot extends EventEmitter {
   }
 
   /**
-   * 스마트 파일 조작 실행 + 펫 애니메이션 + 텔레그램 피드백
+   * Execute smart file operation + pet animation + Telegram feedback
    */
   async _executeFileOp(chatId, command) {
     if (this._fileOpInProgress) {
-      await this.bot.sendMessage(chatId, '이미 파일 작업이 진행 중이야! 잠시만 기다려줘.');
+      await this.bot.sendMessage(chatId, 'A file operation is already in progress! Please wait.');
       return;
     }
 
@@ -406,16 +406,16 @@ class TelegramBot extends EventEmitter {
 
     const callbacks = {
       onStart: (totalFiles) => {
-        this.bot.sendMessage(chatId, `${totalFiles}개 파일을 발견했어! 나르기 시작할게~`);
+        this.bot.sendMessage(chatId, `Found ${totalFiles} files! Starting to carry them~`);
         this._sendToBridge('ai_decision', {
           action: 'excited',
-          speech: `${totalFiles}개 파일 정리 시작!`,
+          speech: `Starting to organize ${totalFiles} files!`,
           emotion: 'happy',
         });
       },
 
       onPickUp: (fileName, index) => {
-        // 펫이 파일을 집어드는 애니메이션
+        // Pet picks up file animation
         this._sendToBridge('smart_file_op', {
           phase: 'pick_up',
           fileName,
@@ -423,13 +423,13 @@ class TelegramBot extends EventEmitter {
         });
         this._sendToBridge('ai_decision', {
           action: 'carrying',
-          speech: `${fileName} 집었다!`,
+          speech: `Picked up ${fileName}!`,
           emotion: 'focused',
         });
       },
 
       onDrop: (fileName, targetName, index) => {
-        // 펫이 파일을 내려놓는 애니메이션
+        // Pet drops file animation
         this._sendToBridge('smart_file_op', {
           phase: 'drop',
           fileName,
@@ -438,7 +438,7 @@ class TelegramBot extends EventEmitter {
         });
         this._sendToBridge('ai_decision', {
           action: 'walking',
-          speech: `${fileName} → ${targetName}에 놓았다!`,
+          speech: `Placed ${fileName} in ${targetName}!`,
           emotion: 'happy',
         });
       },
@@ -448,11 +448,11 @@ class TelegramBot extends EventEmitter {
 
         let message;
         if (result.movedCount === 0) {
-          message = '옮길 파일이 없었어!';
+          message = 'No files to move!';
         } else {
-          message = `${result.movedCount}개 파일 옮겼어!`;
+          message = `Moved ${result.movedCount} files!`;
           if (result.errors.length > 0) {
-            message += `\n(${result.errors.length}개 실패)`;
+            message += `\n(${result.errors.length} failed)`;
           }
         }
 
@@ -463,7 +463,7 @@ class TelegramBot extends EventEmitter {
           emotion: 'proud',
         });
 
-        // smart_file_op 완료 이벤트
+        // smart_file_op completion event
         this._sendToBridge('smart_file_op', {
           phase: 'complete',
           movedCount: result.movedCount,
@@ -473,10 +473,10 @@ class TelegramBot extends EventEmitter {
 
       onError: (error) => {
         this._fileOpInProgress = false;
-        this.bot.sendMessage(chatId, `파일 작업 중 오류 발생: ${error}`);
+        this.bot.sendMessage(chatId, `Error during file operation: ${error}`);
         this._sendToBridge('ai_decision', {
           action: 'scared',
-          speech: '앗, 뭔가 잘못됐어...',
+          speech: 'Oops, something went wrong...',
           emotion: 'scared',
         });
       },
@@ -486,28 +486,28 @@ class TelegramBot extends EventEmitter {
   }
 
   /**
-   * 펫 상태 조회 후 텔레그램으로 전송
+   * Query pet status and send to Telegram
    */
   async _sendStatus(chatId) {
     if (!this.bridge) {
-      await this.bot.sendMessage(chatId, 'AI Bridge에 연결되지 않았어.');
+      await this.bot.sendMessage(chatId, 'Not connected to AI Bridge.');
       return;
     }
 
     const state = this.bridge.petState;
     const statusText =
-      `상태: ${state.state}\n` +
-      `위치: (${state.position.x}, ${state.position.y})\n` +
-      `모드: ${state.mode}\n` +
-      `감정: ${state.emotion}\n` +
-      `진화: ${state.evolutionStage}단계\n` +
-      `AI 연결: ${this.bridge.isConnected() ? 'O' : 'X'}`;
+      `State: ${state.state}\n` +
+      `Position: (${state.position.x}, ${state.position.y})\n` +
+      `Mode: ${state.mode}\n` +
+      `Emotion: ${state.emotion}\n` +
+      `Evolution: Stage ${state.evolutionStage}\n` +
+      `AI Connected: ${this.bridge.isConnected() ? 'Yes' : 'No'}`;
 
     await this.bot.sendMessage(chatId, statusText);
   }
 
   /**
-   * 마지막 파일 이동 되돌리기
+   * Undo last file move
    */
   async _undoLastMove(chatId) {
     try {
@@ -515,75 +515,75 @@ class TelegramBot extends EventEmitter {
       const result = undoAllSmartMoves();
 
       if (result.restoredCount === 0) {
-        await this.bot.sendMessage(chatId, '되돌릴 파일 이동이 없어.');
+        await this.bot.sendMessage(chatId, 'No file moves to undo.');
       } else {
-        let message = `${result.restoredCount}개 파일을 원래 위치로 되돌렸어!`;
+        let message = `Restored ${result.restoredCount} files to original locations!`;
         if (result.errors.length > 0) {
-          message += `\n(${result.errors.length}개 복원 실패)`;
+          message += `\n(${result.errors.length} restore failures)`;
         }
         await this.bot.sendMessage(chatId, message);
         this._sendToBridge('ai_decision', {
           action: 'walking',
-          speech: '파일들을 원래대로 돌려놨어!',
+          speech: 'Restored files to their original locations!',
           emotion: 'happy',
         });
       }
     } catch (err) {
-      await this.bot.sendMessage(chatId, `되돌리기 실패: ${err.message}`);
+      await this.bot.sendMessage(chatId, `Undo failed: ${err.message}`);
     }
   }
 
   /**
-   * AI Bridge에 명령 전달
+   * Forward command to AI Bridge
    */
   _sendToBridge(type, payload) {
     if (!this.bridge) return;
 
-    // bridge의 _handleCommand를 직접 호출 (내부 이벤트 방출)
-    // telegram에서 온 명령임을 표시
+    // Directly invoke bridge's _handleCommand (emit internal event)
+    // Mark as command from Telegram
     payload._fromTelegram = true;
     this.bridge.emit(type, payload);
   }
 
   /**
-   * 모든 활성 채팅에 메시지 브로드캐스트
+   * Broadcast message to all active chats
    */
   _broadcastToChats(text) {
     if (!this.bot || !this.active) return;
 
     for (const chatId of this.activeChatIds) {
       this.bot.sendMessage(chatId, text).catch(() => {
-        // 전송 실패 시 해당 채팅 ID 제거
+        // Remove chat ID on send failure
         this.activeChatIds.delete(chatId);
       });
     }
   }
 
   /**
-   * 특정 채팅에 메시지 전송
+   * Send message to specific chat
    */
   async sendMessage(chatId, text) {
     if (!this.bot || !this.active) return;
     try {
       await this.bot.sendMessage(chatId, text);
     } catch (err) {
-      console.error('[Telegram] 메시지 전송 실패:', err.message);
+      console.error('[Telegram] Message send failed:', err.message);
     }
   }
 
   /**
-   * 봇 중지
+   * Stop bot
    */
   stop() {
     if (this.bot && this.active) {
       this.bot.stopPolling();
       this.active = false;
-      console.log('[Telegram] 봇 중지');
+      console.log('[Telegram] Bot stopped');
     }
   }
 
   /**
-   * 활성 상태 확인
+   * Check if bot is active
    */
   isActive() {
     return this.active;

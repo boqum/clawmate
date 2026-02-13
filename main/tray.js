@@ -9,7 +9,7 @@ let tray = null;
 let aiBridge = null;
 
 /**
- * 16x16 Claw 픽셀아트 아이콘 생성
+ * Generate 16x16 Claw pixel art icon
  */
 const CLAW_ICON = [
   [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
@@ -41,48 +41,48 @@ const COLOR_MAP = {
 };
 
 /**
- * 캐릭터 프리셋 목록
- * 트레이에서 선택하면 set_character 명령으로 렌더러에 전달
+ * Character preset list
+ * When selected from tray, sent to renderer via set_character command
  */
 const CHARACTER_PRESETS = {
   default: {
-    name: '기본 Claw (빨강)',
+    name: 'Default Claw (Red)',
     colorMap: { primary: '#ff4f40', secondary: '#ff775f', dark: '#8B4513', eye: '#ffffff', pupil: '#111111', claw: '#ff4f40' },
   },
   blue: {
-    name: '파란 Claw',
+    name: 'Blue Claw',
     colorMap: { primary: '#4488ff', secondary: '#6699ff', dark: '#223388', eye: '#ffffff', pupil: '#111111', claw: '#4488ff' },
   },
   green: {
-    name: '초록 Claw',
+    name: 'Green Claw',
     colorMap: { primary: '#44cc44', secondary: '#66dd66', dark: '#226622', eye: '#ffffff', pupil: '#111111', claw: '#44cc44' },
   },
   purple: {
-    name: '보라 Claw',
+    name: 'Purple Claw',
     colorMap: { primary: '#8844cc', secondary: '#aa66dd', dark: '#442266', eye: '#ffffff', pupil: '#111111', claw: '#8844cc' },
   },
   gold: {
-    name: '골드 Claw',
+    name: 'Gold Claw',
     colorMap: { primary: '#ffcc00', secondary: '#ffdd44', dark: '#886600', eye: '#ffffff', pupil: '#111111', claw: '#ffcc00' },
   },
   pink: {
-    name: '핑크 Claw',
+    name: 'Pink Claw',
     colorMap: { primary: '#ff69b4', secondary: '#ff8cc4', dark: '#8B3060', eye: '#ffffff', pupil: '#111111', claw: '#ff69b4' },
   },
   cat: {
-    name: '고양이',
+    name: 'Cat',
     colorMap: { primary: '#ff9944', secondary: '#ffbb66', dark: '#663300', eye: '#88ff88', pupil: '#111111', claw: '#ff9944' },
   },
   robot: {
-    name: '로봇',
+    name: 'Robot',
     colorMap: { primary: '#888888', secondary: '#aaaaaa', dark: '#444444', eye: '#66aaff', pupil: '#0044aa', claw: '#66aaff' },
   },
   ghost: {
-    name: '유령',
+    name: 'Ghost',
     colorMap: { primary: '#ccccff', secondary: '#eeeeff', dark: '#6666aa', eye: '#ff6666', pupil: '#cc0000', claw: '#ccccff' },
   },
   dragon: {
-    name: '드래곤',
+    name: 'Dragon',
     colorMap: { primary: '#cc2222', secondary: '#ff4444', dark: '#661111', eye: '#ffaa00', pupil: '#111111', claw: '#ffaa00' },
   },
 };
@@ -114,7 +114,7 @@ function setupTray(mainWindow, bridge) {
 
   const icon = createClawIcon();
   tray = new Tray(icon);
-  tray.setToolTip('ClawMate - 데스크톱 펫');
+  tray.setToolTip('ClawMate - AI Cyber Body');
 
   function buildMenu() {
     const mode = store.get('mode') || 'pet';
@@ -124,7 +124,7 @@ function setupTray(mainWindow, bridge) {
     const currentChar = store.get('character') || 'default';
     const hasTelegramToken = !!(store.get('telegramToken'));
 
-    // 캐릭터 서브메뉴
+    // Character submenu
     const characterSubmenu = Object.entries(CHARACTER_PRESETS).map(([key, preset]) => ({
       label: preset.name,
       type: 'radio',
@@ -140,7 +140,7 @@ function setupTray(mainWindow, bridge) {
             mainWindow.webContents.send('ai-command', {
               type: 'set_character', payload: {
                 colorMap: preset.colorMap,
-                speech: `${preset.name}(으)로 변신!`,
+                speech: `Transforming into ${preset.name}!`,
               },
             });
           }
@@ -155,18 +155,18 @@ function setupTray(mainWindow, bridge) {
         enabled: false,
       },
       {
-        label: aiConnected ? 'AI: 연결됨' : 'AI: 자율 모드',
+        label: aiConnected ? 'AI: Connected' : 'AI: Autonomous Mode',
         enabled: false,
       },
       { type: 'separator' },
 
-      // === 모드 선택 ===
+      // === Mode Selection ===
       {
-        label: '모드',
+        label: 'Mode',
         submenu: [
           {
-            label: 'Pet 모드 (Clawby)',
-            sublabel: '귀여운 펫을 키우기',
+            label: 'Pet Mode (Clawby)',
+            sublabel: 'Raise a cute pet',
             type: 'radio',
             checked: mode === 'pet',
             click: () => {
@@ -176,8 +176,8 @@ function setupTray(mainWindow, bridge) {
             },
           },
           {
-            label: 'Incarnation 모드 (Claw)',
-            sublabel: '봇이 육체를 얻음',
+            label: 'Incarnation Mode (Claw)',
+            sublabel: 'AI gains a cyber body',
             type: 'radio',
             checked: mode === 'incarnation',
             click: () => {
@@ -187,8 +187,8 @@ function setupTray(mainWindow, bridge) {
             },
           },
           {
-            label: '둘 다 (Pet + Incarnation)',
-            sublabel: '펫도 키우고, 봇 인격도 반영',
+            label: 'Both (Pet + Incarnation)',
+            sublabel: 'Raise pet and reflect AI persona',
             type: 'radio',
             checked: mode === 'both',
             click: () => {
@@ -200,17 +200,17 @@ function setupTray(mainWindow, bridge) {
         ],
       },
 
-      // === 캐릭터 선택 ===
+      // === Character Selection ===
       {
-        label: '캐릭터',
+        label: 'Character',
         submenu: characterSubmenu,
       },
 
       { type: 'separator' },
 
-      // === 설정 ===
+      // === Settings ===
       {
-        label: '파일 상호작용',
+        label: 'File Interaction',
         type: 'checkbox',
         checked: fileInteraction,
         click: (item) => {
@@ -219,7 +219,7 @@ function setupTray(mainWindow, bridge) {
         },
       },
       {
-        label: '컴퓨터 시작 시 자동 실행',
+        label: 'Launch at Startup',
         type: 'checkbox',
         checked: autoStart,
         click: () => {
@@ -230,37 +230,37 @@ function setupTray(mainWindow, bridge) {
 
       { type: 'separator' },
 
-      // === 텔레그램 봇 ===
+      // === Telegram Bot ===
       {
-        label: '텔레그램 봇',
+        label: 'Telegram Bot',
         submenu: [
           {
-            label: hasTelegramToken ? '봇 토큰: 설정됨' : '봇 토큰: 미설정',
+            label: hasTelegramToken ? 'Bot Token: Configured' : 'Bot Token: Not Set',
             enabled: false,
           },
           {
-            label: '봇 토큰 설정...',
+            label: 'Set Bot Token...',
             click: async () => {
               const result = await dialog.showMessageBox({
                 type: 'question',
-                buttons: ['클립보드에서 붙여넣기', '직접 입력', '취소'],
-                title: 'ClawMate 텔레그램 봇',
-                message: '텔레그램 봇 토큰을 설정합니다.',
-                detail: '@BotFather에서 받은 봇 토큰을 입력하세요.\n현재 클립보드 내용을 붙여넣으려면 "클립보드에서 붙여넣기"를 선택하세요.',
+                buttons: ['Paste from Clipboard', 'Manual Entry', 'Cancel'],
+                title: 'ClawMate Telegram Bot',
+                message: 'Set up Telegram bot token.',
+                detail: 'Enter the bot token received from @BotFather.\nSelect "Paste from Clipboard" to paste current clipboard content.',
               });
 
               let token = null;
               if (result.response === 0) {
-                // 클립보드에서 붙여넣기
+                // Paste from clipboard
                 token = clipboard.readText().trim();
               } else if (result.response === 1) {
-                // prompt가 없으므로 클립보드 안내
+                // No prompt available, guide to use clipboard
                 const promptResult = await dialog.showMessageBox({
                   type: 'info',
-                  buttons: ['확인'],
-                  title: '텔레그램 봇 토큰',
-                  message: '봇 토큰을 클립보드에 복사한 후 다시 "봇 토큰 설정"을 선택하세요.',
-                  detail: '텔레그램에서 @BotFather → /newbot → 토큰 복사',
+                  buttons: ['OK'],
+                  title: 'Telegram Bot Token',
+                  message: 'Copy the bot token to clipboard, then select "Set Bot Token" again.',
+                  detail: 'In Telegram: @BotFather -> /newbot -> Copy token',
                 });
                 return;
               } else {
@@ -272,26 +272,26 @@ function setupTray(mainWindow, bridge) {
                 process.env.CLAWMATE_TELEGRAM_TOKEN = token;
                 buildAndSet();
 
-                // 펫 알림
+                // Pet notification
                 if (mainWindow && !mainWindow.isDestroyed()) {
                   mainWindow.webContents.send('ai-command', {
                     type: 'speak',
-                    payload: { text: '텔레그램 봇 토큰 설정 완료!' },
+                    payload: { text: 'Telegram bot token configured!' },
                   });
                 }
               } else {
                 await dialog.showMessageBox({
                   type: 'error',
-                  buttons: ['확인'],
-                  title: '잘못된 토큰',
-                  message: '유효한 텔레그램 봇 토큰이 아닙니다.',
-                  detail: '올바른 형식: 123456789:ABCdefGHIjklMNOpqrsTUVwxyz',
+                  buttons: ['OK'],
+                  title: 'Invalid Token',
+                  message: 'Not a valid Telegram bot token.',
+                  detail: 'Correct format: 123456789:ABCdefGHIjklMNOpqrsTUVwxyz',
                 });
               }
             },
           },
           {
-            label: '봇 토큰 제거',
+            label: 'Remove Bot Token',
             enabled: hasTelegramToken,
             click: () => {
               store.set('telegramToken', '');
@@ -305,13 +305,13 @@ function setupTray(mainWindow, bridge) {
       { type: 'separator' },
 
       {
-        label: '업데이트 확인',
+        label: 'Check for Updates',
         click: async () => {
           await checkForUpdateManual(mainWindow);
         },
       },
       {
-        label: '파일 이동 되돌리기',
+        label: 'Undo File Moves',
         click: async () => {
           const manifest = await getFileManifest();
           const pending = manifest.filter(m => !m.restored);
@@ -321,7 +321,7 @@ function setupTray(mainWindow, bridge) {
       },
       { type: 'separator' },
       {
-        label: '종료',
+        label: 'Quit',
         click: () => {
           app.quit();
         },
@@ -333,7 +333,7 @@ function setupTray(mainWindow, bridge) {
     tray.setContextMenu(buildMenu());
   }
 
-  // AI 연결 상태 변경 시 메뉴 업데이트
+  // Update menu when AI connection state changes
   if (aiBridge) {
     aiBridge.on('connected', () => buildAndSet());
     aiBridge.on('disconnected', () => buildAndSet());
@@ -344,7 +344,7 @@ function setupTray(mainWindow, bridge) {
 }
 
 /**
- * 수동 업데이트 확인
+ * Manual update check
  */
 async function checkForUpdateManual(mainWindow) {
   if (app.isPackaged) {
@@ -352,7 +352,7 @@ async function checkForUpdateManual(mainWindow) {
       const { autoUpdater } = require('electron-updater');
       autoUpdater.checkForUpdatesAndNotify();
     } catch (err) {
-      console.error('[업데이트] electron-updater 실패:', err.message);
+      console.error('[Update] electron-updater failed:', err.message);
     }
   } else {
     try {
@@ -366,7 +366,7 @@ async function checkForUpdateManual(mainWindow) {
         if (mainWindow && !mainWindow.isDestroyed()) {
           mainWindow.webContents.send('ai-command', {
             type: 'speak',
-            payload: { text: `새 버전 v${latest} 사용 가능! (현재: v${current})` },
+            payload: { text: `New version v${latest} available! (current: v${current})` },
           });
         }
         shell.openExternal('https://www.npmjs.com/package/clawmate');
@@ -374,16 +374,16 @@ async function checkForUpdateManual(mainWindow) {
         if (mainWindow && !mainWindow.isDestroyed()) {
           mainWindow.webContents.send('ai-command', {
             type: 'speak',
-            payload: { text: `v${current} — 이미 최신 버전이야!` },
+            payload: { text: `v${current} — already up to date!` },
           });
         }
       }
     } catch (err) {
-      console.error('[업데이트] npm 버전 확인 실패:', err.message);
+      console.error('[Update] npm version check failed:', err.message);
       if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.webContents.send('ai-command', {
           type: 'speak',
-          payload: { text: '업데이트 확인 실패...' },
+          payload: { text: 'Update check failed...' },
         });
       }
     }

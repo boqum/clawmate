@@ -1,21 +1,21 @@
 /**
- * ClawMate 렌더러 초기화
+ * ClawMate renderer initialization
  *
- * 아키텍처:
- *   AI (뇌) ←→ AI Bridge (WebSocket) ←→ AI Controller (렌더러)
- *                                                       ↓
+ * Architecture:
+ *   AI (brain) <-> AI Bridge (WebSocket) <-> AI Controller (renderer)
+ *                                                       |
  *                                          StateMachine / PetEngine / Speech
  *
- * AI 연결 시: AI가 모든 행동/말/감정 결정
- * AI 미연결 시: 자율 모드 (FSM 기반) 로 혼자 놀기
+ * When AI connected: AI decides all behaviors/speech/emotions
+ * When AI disconnected: Autonomous mode (FSM-based) plays alone
  */
 (async function initClawMate() {
   const petContainer = document.getElementById('pet-container');
 
-  // 캐릭터 캔버스 생성
+  // Create character canvas
   Character.createCanvas(petContainer);
 
-  // 기본 색상 설정 (Pet 모드)
+  // Set default colors (Pet mode)
   Character.setColorMap({
     primary: '#ff4f40',
     secondary: '#ff775f',
@@ -25,7 +25,7 @@
     claw: '#ff4f40',
   });
 
-  // 상태 변화 콜백
+  // State change callback
   StateMachine.setOnStateChange((prevState, newState) => {
     if (newState === 'sleeping') {
       const pet = document.getElementById('pet-container');
@@ -45,10 +45,10 @@
       Interactions.spawnStarEffect();
     }
 
-    // 모션 히스토리 기록
+    // Record motion history
     Memory.recordMotion(newState);
 
-    // 상태 변화를 AI에 리포트
+    // Report state changes to AI
     if (window.clawmate.reportToAI) {
       window.clawmate.reportToAI('state_change', {
         from: prevState, to: newState,
@@ -56,48 +56,48 @@
     }
   });
 
-  // 이동 엔진 초기화
+  // Initialize movement engine
   PetEngine.init(petContainer);
 
-  // 모드 매니저 초기화
+  // Initialize mode manager
   await ModeManager.init();
 
-  // 메모리 초기화 (진화 상태 포함)
+  // Initialize memory (including evolution state)
   await Memory.init();
 
-  // AI 컨트롤러 초기화 (AI 연결 관리)
+  // Initialize AI controller (AI connection management)
   AIController.init();
 
-  // 상호작용 초기화
+  // Initialize interactions
   Interactions.init();
 
-  // 시간 인식 초기화 (자율 모드에서만 주도적으로 동작)
+  // Initialize time awareness (only proactive in autonomous mode)
   TimeAware.init();
 
-  // 메트릭 수집기 초기화 (선택적 — 없어도 앱 정상 동작)
+  // Initialize metrics collector (optional -- app works fine without it)
   if (typeof Metrics !== 'undefined') {
     Metrics.init();
   }
 
-  // 브라우저 감시 초기화 (참견쟁이 모드)
+  // Initialize browser watcher (nosy mode)
   if (typeof BrowserWatcher !== 'undefined') {
     BrowserWatcher.init();
   }
 
-  // 엔진 시작
+  // Start engine
   PetEngine.start();
 
-  // 말풍선 위치 업데이트 루프
+  // Speech bubble position update loop
   setInterval(() => {
     Speech.updatePosition();
   }, 100);
 
-  // AI 연결 상태 표시
+  // Display AI connection status
   const connected = await window.clawmate.isAIConnected();
   if (connected) {
-    Speech.show('AI와 연결됨. 지시를 기다리는 중...');
+    Speech.show('Connected to AI. Awaiting instructions...');
   } else {
-    Speech.show('안녕! 나 혼자서도 잘 놀 수 있어!');
+    Speech.show('Hi! I can play on my own just fine!');
   }
 
   addDynamicStyles();

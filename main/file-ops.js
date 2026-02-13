@@ -4,14 +4,14 @@ const { getDesktopPath } = require('./desktop-path');
 const manifest = require('./manifest');
 
 /**
- * 바탕화면 파일 이동 시스템 (안전장치 포함)
+ * Desktop file move system (with safety measures)
  *
- * 안전 규칙:
- * - 세션당 최대 3개 파일만 이동
- * - 이동 간 최소 5분 쿨다운
- * - 위험한 확장자 제외
- * - 100MB 이상 파일 제외
- * - 바탕화면 폴더 내에서만 위치 변경
+ * Safety rules:
+ * - Max 3 files moved per session
+ * - Min 5 minute cooldown between moves
+ * - Dangerous extensions excluded
+ * - Files over 100MB excluded
+ * - Position changes only within desktop folder
  */
 
 const MAX_FILES_PER_SESSION = 3;
@@ -26,7 +26,7 @@ let sessionMoveCount = 0;
 let lastMoveTime = 0;
 
 /**
- * 바탕화면 파일 목록 가져오기 (안전한 파일만)
+ * Get desktop file list (safe files only)
  */
 async function getDesktopFiles() {
   const desktop = getDesktopPath();
@@ -60,49 +60,49 @@ async function getDesktopFiles() {
 }
 
 /**
- * 바탕화면 내에서 파일 이름 변경(위치 변경 시뮬레이션)
- * 실제로는 바탕화면 폴더 안에서만 이동 가능
- * newPosition은 렌더러에서 전달한 좌표 (로그용)
+ * Rename file on desktop (simulates position change)
+ * Actually only moves within desktop folder
+ * newPosition is coordinates from renderer (for logging)
  */
 async function moveFile(fileName, newPosition) {
-  // 안전장치 체크
+  // Safety check
   if (sessionMoveCount >= MAX_FILES_PER_SESSION) {
-    return { success: false, error: '세션당 이동 한도(3개) 초과' };
+    return { success: false, error: 'Session move limit (3) exceeded' };
   }
 
   const now = Date.now();
   if (now - lastMoveTime < COOLDOWN_MS && lastMoveTime > 0) {
     const remaining = Math.ceil((COOLDOWN_MS - (now - lastMoveTime)) / 1000);
-    return { success: false, error: `쿨다운 중 (${remaining}초 남음)` };
+    return { success: false, error: `Cooldown active (${remaining}s remaining)` };
   }
 
   const desktop = getDesktopPath();
   const filePath = path.join(desktop, fileName);
 
-  // 파일 존재 확인
+  // Check file exists
   try {
     await fs.promises.access(filePath);
   } catch {
-    return { success: false, error: '파일을 찾을 수 없음' };
+    return { success: false, error: 'File not found' };
   }
 
-  // 확장자 체크
+  // Extension check
   const ext = path.extname(fileName).toLowerCase();
   if (EXCLUDED_EXTS.has(ext)) {
-    return { success: false, error: '보호된 파일 유형' };
+    return { success: false, error: 'Protected file type' };
   }
 
-  // 크기 체크
+  // Size check
   try {
     const stat = await fs.promises.stat(filePath);
     if (stat.size > MAX_FILE_SIZE) {
-      return { success: false, error: '파일 크기 초과 (100MB)' };
+      return { success: false, error: 'File size exceeded (100MB)' };
     }
   } catch {
-    return { success: false, error: '파일 정보 읽기 실패' };
+    return { success: false, error: 'Failed to read file info' };
   }
 
-  // 이동 기록 (바탕화면 내부 이동이므로 실제 파일시스템 위치는 동일)
+  // Record move (filesystem location stays the same since it's within desktop)
   const entry = manifest.addEntry({
     fileName,
     originalPath: filePath,
@@ -117,19 +117,19 @@ async function moveFile(fileName, newPosition) {
 }
 
 /**
- * 단일 파일 이동 되돌리기
+ * Undo single file move
  */
 async function undoFileMove(moveId) {
   const entry = manifest.markRestored(moveId);
   if (!entry) {
-    return { success: false, error: '이동 기록을 찾을 수 없음' };
+    return { success: false, error: 'Move record not found' };
   }
-  // 실제 파일 위치는 바탕화면 내에서만 변경되므로 기록만 업데이트
+  // Only update record since actual file location only changes within desktop
   return { success: true };
 }
 
 /**
- * 모든 파일 이동 되돌리기
+ * Undo all file moves
  */
 async function undoAllMoves() {
   const count = manifest.markAllRestored();
@@ -137,7 +137,7 @@ async function undoAllMoves() {
 }
 
 /**
- * 파일 이동 이력 가져오기
+ * Get file move history
  */
 async function getFileManifest() {
   return manifest.getAll();

@@ -1,22 +1,22 @@
 /**
- * 브라우저 활동 감시 + AI 코멘트 시스템
+ * Browser activity watcher + AI comment system
  *
- * 두 가지 모드:
- *   AI 연결 시: 윈도우 제목 + 화면 캡처 + 커서 위치를 AI에 전송 → AI가 맥락 있는 코멘트 생성
- *   AI 미연결 시: 프리셋 메시지로 폴백 (자율 모드)
+ * Two modes:
+ *   When AI connected: Send window title + screen capture + cursor position to AI -> AI generates contextual comments
+ *   When AI disconnected: Fall back to preset messages (autonomous mode)
  *
- * 동작:
- *   1. 15초마다 활성 윈도우 제목 + 커서 위치 조회
- *   2. 브라우저/앱 감지 시 AI에 컨텍스트 리포트 (제목 + 화면 캡처)
- *   3. AI가 제목/캡처를 분석해서 상황 맞는 코멘트 생성
- *   4. 자율 모드에서는 프리셋 메시지 폴백
+ * Behavior:
+ *   1. Check active window title + cursor position every 15 seconds
+ *   2. Report context to AI when browser/app detected (title + screen capture)
+ *   3. AI analyzes title/capture and generates situation-appropriate comments
+ *   4. Fall back to preset messages in autonomous mode
  */
 const BrowserWatcher = (() => {
-  const CHECK_INTERVAL = 15000;     // 활성 윈도우 체크 주기 (15초)
-  const AI_COOLDOWN = 45000;        // AI 코멘트 쿨다운 (45초)
-  const FALLBACK_COOLDOWN = 90000;  // 자율 모드 코멘트 쿨다운 (90초)
-  const COMMENT_CHANCE = 0.4;       // 코멘트 확률 (40%)
-  const SITE_CHANGE_BONUS = 0.3;    // 사이트 변경 시 추가 확률
+  const CHECK_INTERVAL = 15000;     // Active window check interval (15s)
+  const AI_COOLDOWN = 45000;        // AI comment cooldown (45s)
+  const FALLBACK_COOLDOWN = 90000;  // Autonomous mode comment cooldown (90s)
+  const COMMENT_CHANCE = 0.4;       // Comment probability (40%)
+  const SITE_CHANGE_BONUS = 0.3;    // Additional probability on site change
 
   let intervalId = null;
   let lastCategory = null;
@@ -26,7 +26,7 @@ const BrowserWatcher = (() => {
 
   function init() {
     intervalId = setInterval(check, CHECK_INTERVAL);
-    // 첫 체크는 10초 후 (앱 시작 직후는 건너뜀)
+    // First check after 10 seconds (skip right after app start)
     setTimeout(check, 10000);
   }
 
@@ -34,7 +34,7 @@ const BrowserWatcher = (() => {
     if (!enabled) return;
     if (typeof Speech === 'undefined') return;
 
-    // sleeping 상태면 참견 안 함
+    // Don't comment when in sleeping state
     if (typeof StateMachine !== 'undefined' && StateMachine.getState() === 'sleeping') return;
 
     try {
@@ -47,25 +47,25 @@ const BrowserWatcher = (() => {
 
       const now = Date.now();
 
-      // 카테고리 매칭 (AI/자율 모두 사용)
+      // Category matching (used by both AI and autonomous modes)
       const msgs = window._messages;
       const match = msgs?.browsing ? findCategory(titleLower, msgs.browsing) : null;
       const category = match?.category || 'unknown';
 
-      // 쿨다운 체크
+      // Cooldown check
       const isAI = typeof AIController !== 'undefined' && AIController.isConnected();
       const cooldown = isAI ? AI_COOLDOWN : FALLBACK_COOLDOWN;
       if (now - lastCommentTime < cooldown) return;
 
-      // 같은 카테고리 + 제목 미변경 시 스킵
+      // Skip if same category and title unchanged
       if (category === lastCategory && !titleChanged) return;
 
-      // 확률 체크
+      // Probability check
       let chance = COMMENT_CHANCE;
       if (titleChanged) chance += SITE_CHANGE_BONUS;
       if (Math.random() > chance) return;
 
-      // === AI vs 자율 모드 분기 ===
+      // === AI vs autonomous mode branch ===
       if (isAI) {
         await reportBrowsingToAI(title, category, titleChanged);
       } else {
@@ -75,19 +75,19 @@ const BrowserWatcher = (() => {
       lastCategory = category;
       lastCommentTime = now;
     } catch {
-      // IPC 실패 무시
+      // Ignore IPC failure
     }
   }
 
   /**
-   * AI에 브라우징 컨텍스트 전송
-   * 제목 + 커서 위치 + 화면 캡처를 한번에 전송
-   * AI가 분석하고 코멘트 생성
+   * Send browsing context to AI
+   * Transmit title + cursor position + screen capture together
+   * AI analyzes and generates comments
    */
   async function reportBrowsingToAI(title, category, titleChanged) {
     if (!window.clawmate.reportToAI) return;
 
-    // 커서 위치 조회
+    // Get cursor position
     let cursorX = 0, cursorY = 0;
     try {
       if (window.clawmate.getCursorPosition) {
@@ -97,7 +97,7 @@ const BrowserWatcher = (() => {
       }
     } catch {}
 
-    // 화면 캡처 (AI가 페이지 내용을 시각적으로 분석하기 위해)
+    // Screen capture (for AI to visually analyze page content)
     let screenData = null;
     try {
       const capture = await window.clawmate.screen.capture();
@@ -110,7 +110,7 @@ const BrowserWatcher = (() => {
       }
     } catch {}
 
-    // 통합 브라우징 리포트 전송
+    // Send unified browsing report
     window.clawmate.reportToAI('browsing', {
       title,
       category,
@@ -123,7 +123,7 @@ const BrowserWatcher = (() => {
   }
 
   /**
-   * 자율 모드 폴백: 프리셋 메시지 표시
+   * Autonomous mode fallback: display preset messages
    */
   function showFallbackComment(match) {
     if (!match?.data?.comments) return;
@@ -132,7 +132,7 @@ const BrowserWatcher = (() => {
     const comment = comments[Math.floor(Math.random() * comments.length)];
     Speech.show(comment);
 
-    // 50% 확률로 흥분 애니메이션
+    // 50% chance of excitement animation
     if (typeof StateMachine !== 'undefined') {
       const state = StateMachine.getState();
       if ((state === 'idle' || state === 'walking') && Math.random() < 0.5) {
@@ -145,8 +145,8 @@ const BrowserWatcher = (() => {
   }
 
   /**
-   * 카테고리 매칭 (키워드 기반)
-   * general은 다른 카테고리 매칭 안 될 때만 사용
+   * Category matching (keyword-based)
+   * 'general' is only used when no other category matches
    */
   function findCategory(titleLower, browsingMsgs) {
     let generalMatch = null;

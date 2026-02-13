@@ -1,7 +1,7 @@
 {
   "name": "clawmate",
   "version": "1.4.0",
-  "description": "ClawMate - AI가 조종하는 화면 위의 살아있는 데스크톱 펫",
+  "description": "ClawMate - Give your AI a living body on screen",
   "main": "main/index.js",
   "bin": {
     "clawmate": "./skills/launch-pet/index.js"

@@ -1,15 +1,15 @@
 /**
- * AI 에이전트 측 커넥터
+ * AI Agent-side Connector
  *
- * AI가 ClawMate에 접속해서 펫을 조종하는 클라이언트.
- * ClawMate 플러그인(index.js)에서 사용됨.
+ * Client for AI to connect to ClawMate and control the pet.
+ * Used in the ClawMate plugin (index.js).
  *
- * 사용 예:
+ * Usage:
  *   const connector = new ClawMateConnector();
  *   await connector.connect();
- *   connector.speak('안녕! 오늘 뭐 할 거야?');
+ *   connector.speak('Hello! What are you doing today?');
  *   connector.action('excited');
- *   connector.onUserEvent((event) => { ... AI가 반응 결정 ... });
+ *   connector.onUserEvent((event) => { ... AI decides reaction ... });
  */
 const WebSocket = require('ws');
 const EventEmitter = require('events');
@@ -27,7 +27,7 @@ class ClawMateConnector extends EventEmitter {
   }
 
   /**
-   * ClawMate에 접속
+   * Connect to ClawMate
    */
   connect() {
     return new Promise((resolve, reject) => {
@@ -73,7 +73,7 @@ class ClawMateConnector extends EventEmitter {
       case 'pet_state_update':
         this.petState = payload;
         this.emit('state_update', payload);
-        // queryState() Promise 해소
+        // Resolve queryState() Promise
         if (type === 'state_response' && this._stateResolvers.length > 0) {
           const resolver = this._stateResolvers.shift();
           resolver(payload);
@@ -81,22 +81,22 @@ class ClawMateConnector extends EventEmitter {
         break;
 
       case 'user_event':
-        // 사용자 이벤트 → AI가 반응 결정
+        // User event -> AI decides reaction
         this.emit('user_event', payload);
         break;
 
       case 'screen_capture':
-        // 화면 캡처 응답 → AI가 분석
+        // Screen capture response -> AI analyzes
         this.emit('screen_capture', payload);
         break;
 
       case 'window_positions':
-        // 윈도우 위치 정보 응답 → 탐험 시스템에서 사용
+        // Window position info response -> used by exploration system
         this.emit('window_positions', payload);
         break;
 
       case 'metrics_report':
-        // 메트릭 데이터 수신 → AI가 분석
+        // Metrics data received -> AI analyzes
         this.emit('metrics_report', payload);
         break;
 
@@ -115,109 +115,109 @@ class ClawMateConnector extends EventEmitter {
     }
   }
 
-  // === AI → ClawMate 명령 API ===
+  // === AI -> ClawMate Command API ===
 
-  /** 펫이 말하게 함 */
+  /** Make the pet speak */
   speak(text, style = 'normal') {
     return this._send('speak', { text, style });
   }
 
-  /** 펫이 생각하게 함 (말풍선에 ...) */
+  /** Make the pet think (shows ... in speech bubble) */
   think(text) {
     return this._send('think', { text });
   }
 
-  /** 펫 행동 변경 */
+  /** Change pet behavior */
   action(state, duration) {
     return this._send('action', { state, duration });
   }
 
-  /** 특정 위치로 이동 */
+  /** Move to specific position */
   moveTo(x, y, speed) {
     return this._send('move', { x, y, speed });
   }
 
-  /** 감정 표현 */
+  /** Express emotion */
   emote(emotion) {
     return this._send('emote', { emotion });
   }
 
-  /** 파일 집어들기 */
+  /** Pick up file */
   carryFile(fileName, targetX) {
     return this._send('carry_file', { fileName, targetX });
   }
 
-  /** 파일 내려놓기 */
+  /** Drop file */
   dropFile() {
     return this._send('drop_file', {});
   }
 
-  /** 모드 전환 */
+  /** Switch mode */
   setMode(mode) {
     return this._send('set_mode', { mode });
   }
 
-  /** 진화 트리거 */
+  /** Trigger evolution */
   evolve(stage) {
     return this._send('evolve', { stage });
   }
 
   /**
-   * AI 종합 의사결정 전송
-   * AI가 상황을 분석하고 내린 결정을 한번에 전송
+   * Send comprehensive AI decision
+   * Sends the AI's analyzed decision in a single message
    */
   decide(decision) {
     return this._send('ai_decision', decision);
   }
 
-  // === 공간 이동 API (펫이 컴퓨터를 "집"처럼 돌아다님) ===
+  // === Spatial Movement API (pet roams the computer like its "home") ===
 
-  /** 특정 위치로 점프 */
+  /** Jump to specific position */
   jumpTo(x, y) {
     return this._send('jump_to', { x, y });
   }
 
-  /** 레펠 시작 (천장/벽에서 실 타고 내려감) */
+  /** Start rappelling (descend from ceiling/wall on thread) */
   rappel() {
     return this._send('rappel', {});
   }
 
-  /** 레펠 실 해제 (낙하) */
+  /** Release rappel thread (fall) */
   releaseThread() {
     return this._send('release_thread', {});
   }
 
-  /** 화면 중앙으로 이동 */
+  /** Move to screen center */
   moveToCenter() {
     return this._send('move_to_center', {});
   }
 
-  /** 특정 윈도우 위로 점프 */
+  /** Jump onto specific window */
   walkOnWindow(windowId, x, y) {
     return this._send('walk_on_window', { windowId, x, y });
   }
 
-  /** 열린 윈도우 목록 요청 */
+  /** Request list of open windows */
   queryWindows() {
     return this._send('query_windows', {});
   }
 
-  // === 커스텀 이동 패턴 API ===
+  // === Custom Movement Pattern API ===
 
   /**
-   * 커스텀 이동 패턴 등록
-   * ClawMate에 새로운 이동 패턴을 동적으로 추가
+   * Register custom movement pattern
+   * Dynamically add new movement patterns to ClawMate
    *
-   * @param {string} name - 패턴 이름 (예: 'figure8', 'spiral')
-   * @param {object} definition - 패턴 정의
+   * @param {string} name - Pattern name (e.g., 'figure8', 'spiral')
+   * @param {object} definition - Pattern definition
    *   type: 'waypoints' | 'formula' | 'sequence'
-   *   waypoints?: [{x, y, pause?}]      — 웨이포인트 순차 이동
-   *   formula?: { xAmp, yAmp, xFreq, yFreq, xPhase, yPhase }  — 수학 궤도
-   *   sequence?: ['zigzag', 'shake']     — 기존 패턴 순차 실행
-   *   duration?: number                  — 지속 시간 (ms, formula 타입)
-   *   speed?: number                     — 이동 속도
+   *   waypoints?: [{x, y, pause?}]      -- Sequential waypoint movement
+   *   formula?: { xAmp, yAmp, xFreq, yFreq, xPhase, yPhase }  -- Mathematical orbit
+   *   sequence?: ['zigzag', 'shake']     -- Execute existing patterns sequentially
+   *   duration?: number                  -- Duration (ms, for formula type)
+   *   speed?: number                     -- Movement speed
    *
-   * 사용 예:
+   * Usage:
    *   connector.registerMovement('figure8', {
    *     type: 'formula',
    *     formula: { xAmp: 80, yAmp: 40, xFreq: 1, yFreq: 2 },
@@ -229,14 +229,14 @@ class ClawMateConnector extends EventEmitter {
   }
 
   /**
-   * 등록된 커스텀 이동 패턴 실행
+   * Execute registered custom movement pattern
    *
-   * @param {string} name - 실행할 패턴 이름
-   *   사전 등록 패턴: 'zigzag', 'patrol', 'circle', 'shake', 'dance'
-   *   또는 registerMovement()로 등록한 커스텀 패턴
-   * @param {object} params - 실행 파라미터 (패턴별로 다름)
+   * @param {string} name - Pattern name to execute
+   *   Built-in patterns: 'zigzag', 'patrol', 'circle', 'shake', 'dance'
+   *   Or custom patterns registered via registerMovement()
+   * @param {object} params - Execution parameters (varies by pattern)
    *
-   * 사용 예:
+   * Usage:
    *   connector.customMove('zigzag', { distance: 200, amplitude: 30 });
    *   connector.customMove('patrol', { pointAX: 100, pointBX: 500, laps: 5 });
    *   connector.customMove('shake', { intensity: 6, duration: 1000 });
@@ -245,39 +245,39 @@ class ClawMateConnector extends EventEmitter {
     return this._send('custom_move', { name, params });
   }
 
-  /** 현재 실행 중인 커스텀 이동 강제 중지 */
+  /** Force stop currently running custom movement */
   stopCustomMove() {
     return this._send('stop_custom_move', {});
   }
 
-  /** 등록된 이동 패턴 목록 요청 (응답은 user_event로 수신) */
+  /** Request list of registered movement patterns (response via user_event) */
   listMovements() {
     return this._send('list_movements', {});
   }
 
-  /** 스마트 파일 조작 명령 전송 */
+  /** Send smart file operation command */
   smartFileOp(payload) {
     return this._send('smart_file_op', payload);
   }
 
-  /** 캐릭터 데이터 전송 (AI 생성 캐릭터 적용) */
+  /** Send character data (apply AI-generated character) */
   setCharacter(data) {
     return this._send('set_character', data);
   }
 
-  /** 원래 캐릭터로 리셋 */
+  /** Reset to default character */
   resetCharacter() {
     return this._send('reset_character', {});
   }
 
-  /** 인격체 전환 (Incarnation 모드에서 봇 인격 반영) */
+  /** Switch persona (reflect bot personality in Incarnation mode) */
   setPersona(data) {
     return this._send('set_persona', data);
   }
 
   /**
-   * 현재 펫 상태 요청 (Promise 반환)
-   * 서버에서 state_response가 오면 resolve, 타임아웃 시 캐시된 상태 반환
+   * Request current pet state (returns Promise)
+   * Resolves when state_response arrives from server, returns cached state on timeout
    */
   queryState(timeout = 2000) {
     return new Promise((resolve) => {
@@ -297,22 +297,22 @@ class ClawMateConnector extends EventEmitter {
     });
   }
 
-  /** 화면 캡처 요청 (ClawMate에서 스크린샷 촬영 후 응답) */
+  /** Request screen capture (ClawMate takes screenshot and responds) */
   requestScreenCapture() {
     return this._send('query_screen', {});
   }
 
-  /** 화면 캡처 응답 리스너 등록 */
+  /** Register screen capture response listener */
   onScreenCapture(callback) {
     this.on('screen_capture', callback);
   }
 
-  /** 사용자 이벤트 리스너 등록 */
+  /** Register user event listener */
   onUserEvent(callback) {
     this.on('user_event', callback);
   }
 
-  /** 메트릭 리포트 리스너 등록 */
+  /** Register metrics report listener */
   onMetrics(callback) {
     this.on('metrics_report', callback);
   }

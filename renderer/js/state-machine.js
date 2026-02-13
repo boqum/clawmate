@@ -1,11 +1,11 @@
 /**
- * 펫 행동 유한 상태 머신 (FSM)
+ * Pet behavior finite state machine (FSM)
  *
- * 상태 전이도:
- *   IDLE → WALKING → CLIMBING_UP → CEILING_WALK
- *   IDLE ← PLAYING ← CLIMBING_DOWN ← (천장/벽)
- *   IDLE → SLEEPING (23:00~06:00)
- *   인터럽트: 클릭→INTERACTING, 커서→SCARED/EXCITED
+ * State transition diagram:
+ *   IDLE -> WALKING -> CLIMBING_UP -> CEILING_WALK
+ *   IDLE <- PLAYING <- CLIMBING_DOWN <- (ceiling/wall)
+ *   IDLE -> SLEEPING (23:00~06:00)
+ *   Interrupts: click->INTERACTING, cursor->SCARED/EXCITED
  */
 const StateMachine = (() => {
   const STATES = {
@@ -20,13 +20,13 @@ const StateMachine = (() => {
     INTERACTING: 'interacting',
     SCARED: 'scared',
     EXCITED: 'excited',
-    JUMPING: 'jumping',       // 포물선 점프 중 (물리 엔진이 제어)
-    RAPPELLING: 'rappelling', // 실(thread)을 타고 하강 중
-    FALLING: 'falling',       // 중력에 의한 자유 낙하 중
-    CUSTOM: 'custom',         // 커스텀 이동 패턴 실행 중 (Movement Registry)
+    JUMPING: 'jumping',       // Parabolic jump in progress (controlled by physics engine)
+    RAPPELLING: 'rappelling', // Descending on thread
+    FALLING: 'falling',       // Free fall under gravity
+    CUSTOM: 'custom',         // Custom movement pattern in progress (Movement Registry)
   };
 
-  // 각 상태의 최소/최대 지속 시간(ms)
+  // Min/max duration per state (ms)
   const DURATIONS = {
     [STATES.IDLE]:          { min: 2000, max: 5000 },
     [STATES.WALKING]:       { min: 3000, max: 8000 },
@@ -39,10 +39,10 @@ const StateMachine = (() => {
     [STATES.INTERACTING]:   { min: 1500, max: 3000 },
     [STATES.SCARED]:        { min: 1000, max: 2000 },
     [STATES.EXCITED]:       { min: 1500, max: 3000 },
-    [STATES.JUMPING]:       { min: 500, max: 2000 },    // 점프 비행 시간
-    [STATES.RAPPELLING]:    { min: 2000, max: 8000 },   // 레펠 하강 시간
-    [STATES.FALLING]:       { min: 200, max: 1000 },    // 낙하 시간
-    [STATES.CUSTOM]:        { min: 500, max: 30000 },   // 커스텀 이동 (패턴에 따라 가변)
+    [STATES.JUMPING]:       { min: 500, max: 2000 },    // Jump flight time
+    [STATES.RAPPELLING]:    { min: 2000, max: 8000 },   // Rappel descent time
+    [STATES.FALLING]:       { min: 200, max: 1000 },    // Fall time
+    [STATES.CUSTOM]:        { min: 500, max: 30000 },   // Custom movement (varies by pattern)
   };
 
   let currentState = STATES.IDLE;
@@ -51,7 +51,7 @@ const StateMachine = (() => {
   let personality = null;
   let onStateChange = null;
 
-  // 기본 전이 확률 (personality로 조정됨)
+  // Base transition probabilities (adjusted by personality)
   const BASE_TRANSITIONS = {
     [STATES.IDLE]: [
       { state: STATES.WALKING, weight: 0.5 },
@@ -63,7 +63,7 @@ const StateMachine = (() => {
       { state: STATES.CLIMBING_UP, weight: 0.2 },
       { state: STATES.WALKING, weight: 0.25 },
       { state: STATES.PLAYING, weight: 0.2 },
-      { state: STATES.JUMPING, weight: 0.05 },  // 가끔 점프 (낮은 확률)
+      { state: STATES.JUMPING, weight: 0.05 },  // Occasional jump (low probability)
     ],
     [STATES.CLIMBING_UP]: [
       { state: STATES.CEILING_WALK, weight: 0.5 },
@@ -72,7 +72,7 @@ const StateMachine = (() => {
     [STATES.CEILING_WALK]: [
       { state: STATES.CLIMBING_DOWN, weight: 0.4 },
       { state: STATES.CEILING_WALK, weight: 0.4 },
-      { state: STATES.RAPPELLING, weight: 0.2 },  // 천장에서 레펠로 하강
+      { state: STATES.RAPPELLING, weight: 0.2 },  // Rappel descent from ceiling
     ],
     [STATES.CLIMBING_DOWN]: [
       { state: STATES.WALKING, weight: 0.5 },
@@ -103,21 +103,21 @@ const StateMachine = (() => {
       { state: STATES.IDLE, weight: 0.5 },
       { state: STATES.WALKING, weight: 0.5 },
     ],
-    // 점프 후: 착지하면 idle 또는 walking으로
+    // After jump: idle or walking on landing
     [STATES.JUMPING]: [
       { state: STATES.IDLE, weight: 0.5 },
       { state: STATES.WALKING, weight: 0.5 },
     ],
-    // 레펠 후: 낙하하거나 착지
+    // After rappel: fall or land
     [STATES.RAPPELLING]: [
       { state: STATES.FALLING, weight: 0.3 },
       { state: STATES.IDLE, weight: 0.7 },
     ],
-    // 낙하 후: 착지하면 idle
+    // After fall: idle on landing
     [STATES.FALLING]: [
       { state: STATES.IDLE, weight: 1.0 },
     ],
-    // 커스텀 이동 완료 후: idle 또는 walking
+    // After custom movement: idle or walking
     [STATES.CUSTOM]: [
       { state: STATES.IDLE, weight: 0.6 },
       { state: STATES.WALKING, weight: 0.4 },
@@ -153,7 +153,7 @@ const StateMachine = (() => {
     if (forceState) {
       currentState = forceState;
     } else {
-      // 수면 시간 확인 (23:00~06:00)
+      // Sleep time check (23:00~06:00)
       const hour = new Date().getHours();
       if (hour >= 23 || hour < 6) {
         if (currentState !== STATES.SLEEPING && Math.random() < 0.3) {

@@ -1,6 +1,6 @@
-/* 파티클 및 전환 효과 */
+/* Particle and transition effects */
 
-/* 모드 전환 파티클 */
+/* Mode transition particle */
 .mode-transition-particle {
   position: absolute;
   width: 4px;
@@ -21,7 +21,7 @@
   }
 }
 
-/* 진화 글로우 링 */
+/* Evolution glow ring */
 .evolve-ring {
   position: absolute;
   border-radius: 50%;
@@ -41,7 +41,7 @@
   }
 }
 
-/* 파일 픽업 이펙트 */
+/* File pickup effect */
 .file-pickup-effect {
   position: absolute;
   font-size: 12px;
@@ -57,7 +57,7 @@
   100% { opacity: 0; transform: translateY(-30px); }
 }
 
-/* 꼬리 흔들기 (idle 상태 추가 효과) */
+/* Tail wag (additional idle state effect) */
 .tail-wag {
   animation: wag 0.5s ease-in-out infinite alternate;
 }
@@ -67,7 +67,7 @@
   100% { transform: rotate(5deg); }
 }
 
-/* 진화 단계 전환 — 밝은 플래시 */
+/* Evolution stage transition -- bright flash */
 .evolve-flash {
   position: fixed;
   top: 0;

@@ -1,20 +1,20 @@
 /**
- * 파일 조작 명령 파서
+ * File operation command parser
  *
- * 한국어/영어 자연어를 파싱하여 파일 조작 의도를 추출한다.
- * 텔레그램 메시지에서 파일 이동, 정리 등의 명령을 감지.
+ * Parses Korean/English natural language to extract file operation intent.
+ * Detects file move, organize, etc. commands from Telegram messages.
  *
- * 지원 패턴:
- *   - "바탕화면의 .md 파일을 tata 폴더에 넣어줘"
- *   - "스크린샷 폴더에 .png 정리해"
- *   - "바탕화면 정리해"
+ * Supported patterns:
+ *   - "바탕화면의 .md 파일을 tata 폴더에 넣어줘" (Korean: move .md files from desktop to tata folder)
+ *   - "스크린샷 폴더에 .png 정리해" (Korean: organize .png into screenshots folder)
+ *   - "바탕화면 정리해" (Korean: clean up desktop)
  *   - "move .txt files to docs folder"
  */
 
 const os = require('os');
 const path = require('path');
 
-// 알려진 소스 경로 별칭 (한국어 + 영어)
+// Known source path aliases (Korean + English)
 const SOURCE_ALIASES = {
   '바탕화면': () => _getDesktopPath(),
   '데스크탑': () => _getDesktopPath(),
@@ -27,7 +27,7 @@ const SOURCE_ALIASES = {
   'documents': () => path.join(os.homedir(), 'Documents'),
 };
 
-// 행동 명령 키워드 → 액션 매핑
+// Action command keywords -> action mapping
 const ACTION_KEYWORDS = {
   '점프': 'jumping',
   '점프해': 'jumping',
@@ -58,24 +58,24 @@ const ACTION_KEYWORDS = {
   'rappel': 'rappelling',
 };
 
-// 파일 조작 감지 키워드
+// File operation detection patterns
 const FILE_OP_PATTERNS = [
-  // "~의 .ext 파일을 ~폴더에 넣어줘/옮겨줘/이동해"
+  // Korean: "~의 .ext 파일을 ~폴더에 넣어줘/옮겨줘/이동해" (move .ext files from ~ to ~ folder)
   /(?:(.+?)(?:의|에서|에 있는)\s+)?([.\w*]+)\s*파일(?:을|들을)?\s+(.+?)(?:폴더)?(?:에|으로)\s*(?:넣어|옮겨|이동|정리|보내)/,
-  // "~폴더에 .ext 정리해"
+  // Korean: "~폴더에 .ext 정리해" (organize .ext into ~ folder)
   /(.+?)(?:폴더)?(?:에|으로)\s+([.\w*]+)\s*(?:파일\s*)?(?:정리|넣어|옮겨|이동)/,
-  // "바탕화면 정리해"
+  // Korean: "바탕화면 정리해" (clean up desktop)
   /(.+?)\s*(?:정리|청소|깔끔하게)\s*(?:해|해줘|하자|좀)/,
-  // 영어: "move .ext files to folder"
+  // English: "move .ext files to folder"
   /move\s+([.\w*]+)\s+files?\s+(?:to|into)\s+(\S+)/i,
-  // 영어: "clean up desktop"
+  // English: "clean up desktop"
   /clean\s*(?:up)?\s+(\S+)/i,
-  // 영어: "organize desktop"
+  // English: "organize desktop"
   /organize\s+(\S+)/i,
 ];
 
 /**
- * 데스크톱 경로 가져오기 (file-ops와 동일 로직)
+ * Get desktop path (same logic as file-ops)
  */
 function _getDesktopPath() {
   try {
@@ -87,9 +87,9 @@ function _getDesktopPath() {
 }
 
 /**
- * 소스 별칭을 실제 경로로 변환
- * @param {string} alias - 소스 별칭 (예: "바탕화면")
- * @returns {string|null} 실제 경로 또는 null
+ * Resolve source alias to actual path
+ * @param {string} alias - Source alias (e.g., "desktop", "바탕화면")
+ * @returns {string|null} Actual path or null
  */
 function resolveSource(alias) {
   if (!alias) return null;
@@ -103,8 +103,8 @@ function resolveSource(alias) {
 }
 
 /**
- * 자동 분류 확장자 → 폴더명 매핑
- * "바탕화면 정리해" 같은 범용 명령에서 사용
+ * Auto-categorize extension -> folder name mapping
+ * Used in generic commands like "clean up desktop"
  */
 const AUTO_CATEGORIES = {
   '.png': '이미지',
@@ -141,8 +141,8 @@ const AUTO_CATEGORIES = {
 };
 
 /**
- * 메시지에서 행동 명령을 감지
- * @param {string} text - 사용자 메시지
+ * Detect action commands from message
+ * @param {string} text - User message
  * @returns {{ type: 'action', action: string }|null}
  */
 function parseActionCommand(text) {
@@ -158,15 +158,15 @@ function parseActionCommand(text) {
 }
 
 /**
- * 메시지에서 파일 조작 명령을 감지
- * @param {string} text - 사용자 메시지
+ * Detect file operation commands from message
+ * @param {string} text - User message
  * @returns {{ type: 'smart_file_op', source: string, filter: string, target: string, autoCategory: boolean }|null}
  */
 function parseFileCommand(text) {
   if (!text) return null;
   const trimmed = text.trim();
 
-  // 패턴 1: "바탕화면의 .md 파일을 tata 폴더에 넣어줘"
+  // Pattern 1: "바탕화면의 .md 파일을 tata 폴더에 넣어줘" (Korean: move files)
   const pattern1 = /(?:(.+?)(?:의|에서|에 있는)\s+)?([.\w*]+)\s*파일(?:을|들을)?\s+(.+?)(?:\s*폴더)?(?:에|으로)\s*(?:넣어|옮겨|이동|정리|보내)/;
   let match = trimmed.match(pattern1);
   if (match) {
@@ -184,7 +184,7 @@ function parseFileCommand(text) {
     };
   }
 
-  // 패턴 2: "스크린샷 폴더에 .png 정리해"
+  // Pattern 2: "스크린샷 폴더에 .png 정리해" (Korean: organize into folder)
   const pattern2 = /(.+?)(?:\s*폴더)?(?:에|으로)\s+([.\w*]+)\s*(?:파일\s*)?(?:정리|넣어|옮겨|이동)/;
   match = trimmed.match(pattern2);
   if (match) {
@@ -200,7 +200,7 @@ function parseFileCommand(text) {
     };
   }
 
-  // 패턴 3: "바탕화면 정리해" (자동 분류)
+  // Pattern 3: "바탕화면 정리해" (Korean: auto-categorize cleanup)
   const pattern3 = /(.+?)\s*(?:정리|청소|깔끔하게)\s*(?:해|해줘|하자|좀)?$/;
   match = trimmed.match(pattern3);
   if (match) {
@@ -217,7 +217,7 @@ function parseFileCommand(text) {
     }
   }
 
-  // 패턴 4 (영어): "move .txt files to docs"
+  // Pattern 4 (English): "move .txt files to docs"
   const pattern4 = /move\s+([.\w*]+)\s+files?\s+(?:to|into)\s+(\S+)/i;
   match = trimmed.match(pattern4);
   if (match) {
@@ -233,7 +233,7 @@ function parseFileCommand(text) {
     };
   }
 
-  // 패턴 5 (영어): "clean up desktop" / "organize desktop"
+  // Pattern 5 (English): "clean up desktop" / "organize desktop"
   const pattern5 = /(?:clean\s*(?:up)?|organize)\s+(\S+)/i;
   match = trimmed.match(pattern5);
   if (match) {
@@ -254,15 +254,15 @@ function parseFileCommand(text) {
 }
 
 /**
- * 캐릭터 변경 명령 감지
- * @param {string} text - 사용자 메시지
+ * Detect character change commands
+ * @param {string} text - User message
  * @returns {{ type: 'character_change', concept: string }|null}
  */
 function parseCharacterCommand(text) {
   if (!text) return null;
   const trimmed = text.trim();
 
-  // 한국어 캐릭터 변경 패턴
+  // Korean character change patterns
   const krPatterns = [
     /(?:캐릭터|펫|모습|외형|외모)(?:를|을)?\s*(.+?)(?:로|으로)\s*(?:바꿔|변경|변신|만들어|바꿀래|바꾸고|바꿔줘|변경해|만들어줘)/,
     /(.+?)(?:로|으로)\s*(?:캐릭터|펫|모습|외형)\s*(?:바꿔|변경|변신|변경해|바꿔줘)/,
@@ -276,7 +276,7 @@ function parseCharacterCommand(text) {
     }
   }
 
-  // 영어 캐릭터 변경 패턴
+  // English character change patterns
   const enPatterns = [
     /(?:change|switch|transform)\s+(?:character|pet|look)\s+(?:to|into)\s+(.+)/i,
     /(?:make|create|generate)\s+(?:a\s+)?(.+?)\s+(?:character|pet)/i,
@@ -293,25 +293,25 @@ function parseCharacterCommand(text) {
 }
 
 /**
- * 메시지 종합 파싱: 캐릭터 변경 > 파일 조작 > 행동 명령 > 일반 대화 순으로 판별
- * @param {string} text - 사용자 메시지
+ * Comprehensive message parsing: character change > file operation > action command > general chat
+ * @param {string} text - User message
  * @returns {{ type: string, ... }}
  */
 /**
- * 모드/설정 변경 명령 감지
- * @param {string} text - 사용자 메시지
+ * Detect mode/setting change commands
+ * @param {string} text - User message
  * @returns {{ type: 'mode_change', mode: string }|{ type: 'setting', key, value }|null}
  */
 function parseSettingCommand(text) {
   if (!text) return null;
   const t = text.trim().toLowerCase();
 
-  // 모드 변경
+  // Mode change
   if (/(?:펫|pet)\s*모드/.test(t)) return { type: 'mode_change', mode: 'pet' };
   if (/(?:인카|인격|incarnation|claw)\s*모드/.test(t)) return { type: 'mode_change', mode: 'incarnation' };
   if (/둘\s*다\s*모드|both\s*mode/i.test(t)) return { type: 'mode_change', mode: 'both' };
 
-  // 캐릭터 프리셋 선택 (트레이 프리셋과 동일)
+  // Character preset selection (same as tray presets)
   const presetMap = {
     '파란|파랑|blue': 'blue', '초록|green': 'green', '보라|purple': 'purple',
     '골드|금색|gold': 'gold', '핑크|pink': 'pink',
@@ -329,23 +329,23 @@ function parseSettingCommand(text) {
 }
 
 function parseMessage(text) {
-  // 0순위: 설정/모드 변경 명령
+  // Priority 0: setting/mode change commands
   const settingCmd = parseSettingCommand(text);
   if (settingCmd) return settingCmd;
 
-  // 1순위: 캐릭터 변경 명령 (AI 생성)
+  // Priority 1: character change commands (AI generation)
   const charCmd = parseCharacterCommand(text);
   if (charCmd) return charCmd;
 
-  // 2순위: 파일 조작 명령
+  // Priority 2: file operation commands
   const fileCmd = parseFileCommand(text);
   if (fileCmd) return fileCmd;
 
-  // 3순위: 행동 명령
+  // Priority 3: action commands
   const actionCmd = parseActionCommand(text);
   if (actionCmd) return actionCmd;
 
-  // 4순위: 일반 대화 (speak)
+  // Priority 4: general chat (speak)
   return { type: 'speak', text };
 }
 

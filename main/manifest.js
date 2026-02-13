@@ -3,8 +3,8 @@ const path = require('path');
 const { app } = require('electron');
 
 /**
- * 파일 이동 이력 관리 (Undo 지원)
- * 모든 파일 이동을 기록하고, 복원 가능하게 관리
+ * File move history management (Undo support)
+ * Records all file moves and manages restoration
  */
 const MANIFEST_FILE = () => path.join(app.getPath('userData'), 'file-manifest.json');
 

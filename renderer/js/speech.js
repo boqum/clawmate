@@ -1,8 +1,8 @@
 /**
- * 말풍선 시스템
- * - 타자기 효과 (30ms/글자)
- * - 5초 유지 → 페이드 아웃
- * - 모드별 스타일: Pet(둥글고 빨간 테두리) / Incarnation(각지고 틸 발광)
+ * Speech bubble system
+ * - Typewriter effect (30ms/char)
+ * - Hold for 5s -> fade out
+ * - Mode-based styling: Pet (rounded, red border) / Incarnation (angular, teal glow)
  */
 const Speech = (() => {
   const CHAR_DELAY = 30;
@@ -19,18 +19,18 @@ const Speech = (() => {
   }
 
   /**
-   * 캐릭터 위치(edge)에 따라 말풍선 좌표를 계산
-   * - bottom(바닥): 캐릭터 위에
-   * - left(왼쪽 벽): 캐릭터 오른쪽(머리 쪽)에
-   * - right(오른쪽 벽): 캐릭터 왼쪽(머리 쪽)에
-   * - top(천장): 캐릭터 아래에
-   * - 점프/낙하/레펠 중: 캐릭터 위에 (기본)
+   * Calculate speech bubble coordinates based on character position (edge)
+   * - bottom (floor): above character
+   * - left (left wall): to character's right (head side)
+   * - right (right wall): to character's left (head side)
+   * - top (ceiling): below character
+   * - jumping/falling/rappelling: above character (default)
    */
   function getBubblePosition(pos) {
     const edge = pos.edge;
     const mode = pos.movementMode;
 
-    // 공중일 때는 항상 위에 표시
+    // Always show above when in mid-air
     if (mode === 'jumping' || mode === 'falling' || mode === 'rappelling') {
       return { left: pos.x - 30, top: pos.y - 60 };
     }
@@ -49,10 +49,10 @@ const Speech = (() => {
   }
 
   /**
-   * 말풍선이 화면 밖으로 나가지 않도록 좌표를 제한
+   * Clamp coordinates to prevent speech bubble from going off-screen
    */
   function clampBubblePosition(left, top) {
-    const maxW = window.innerWidth - 200;  // 말풍선 대략 너비 고려
+    const maxW = window.innerWidth - 200;  // Account for approximate bubble width
     const maxH = window.innerHeight - 50;
     return {
       left: Math.max(5, Math.min(left, maxW)),
@@ -61,7 +61,7 @@ const Speech = (() => {
   }
 
   function show(text) {
-    hide(); // 기존 말풍선 제거
+    hide(); // Remove existing bubble
 
     const container = document.getElementById('speech-container');
     const pos = PetEngine.getPosition();
@@ -69,7 +69,7 @@ const Speech = (() => {
     const bubble = document.createElement('div');
     bubble.className = `speech-bubble speech-${mode}`;
 
-    // edge별 말풍선 위치 계산 + 화면 밖 방지 clamp
+    // Calculate bubble position per edge + off-screen prevention clamp
     const rawPos = getBubblePosition(pos);
     const clamped = clampBubblePosition(rawPos.left, rawPos.top);
     bubble.style.left = clamped.left + 'px';
@@ -82,7 +82,7 @@ const Speech = (() => {
     container.appendChild(bubble);
     currentBubble = bubble;
 
-    // 타자기 효과
+    // Typewriter effect
     let charIndex = 0;
     typeTimer = setInterval(() => {
       if (charIndex < text.length) {
@@ -94,7 +94,7 @@ const Speech = (() => {
       }
     }, CHAR_DELAY);
 
-    // 자동 숨김
+    // Auto-hide
     const totalTypeTime = text.length * CHAR_DELAY;
     hideTimer = setTimeout(() => {
       if (currentBubble) {
@@ -116,14 +116,14 @@ const Speech = (() => {
   function updatePosition() {
     if (!currentBubble) return;
     const pos = PetEngine.getPosition();
-    // edge별 말풍선 위치 재계산 + 화면 밖 방지
+    // Recalculate bubble position per edge + off-screen prevention
     const rawPos = getBubblePosition(pos);
     const clamped = clampBubblePosition(rawPos.left, rawPos.top);
     currentBubble.style.left = clamped.left + 'px';
     currentBubble.style.top = clamped.top + 'px';
   }
 
-  // --- 메시지 선택 헬퍼 ---
+  // --- Message selection helpers ---
   function randomFrom(arr) {
     return arr[Math.floor(Math.random() * arr.length)];
   }

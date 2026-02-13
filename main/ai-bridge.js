@@ -1,14 +1,14 @@
 /**
- * AI ↔ ClawMate 브릿지
+ * AI <-> ClawMate Bridge
  *
- * AI 에이전트가 ClawMate의 뇌 역할을 한다.
- * - AI → ClawMate: 행동 명령, 말풍선, 감정, 이동
- * - ClawMate → AI: 사용자 이벤트 (클릭, 드래그, 커서, 파일 변화)
+ * AI agent serves as ClawMate's brain.
+ * - AI -> ClawMate: Action commands, speech bubbles, emotions, movement
+ * - ClawMate -> AI: User events (click, drag, cursor, file changes)
  *
- * 통신: WebSocket (로컬 ws://localhost:9320)
- * 프로토콜: JSON 메시지
+ * Communication: WebSocket (local ws://localhost:9320)
+ * Protocol: JSON messages
  *
- * AI 연결 안 됐을 때 → 자율 모드 (기존 FSM) 로 폴백
+ * When AI is not connected -> falls back to autonomous mode (existing FSM)
  */
 const WebSocket = require('ws');
 const EventEmitter = require('events');
@@ -17,7 +17,7 @@ class AIBridge extends EventEmitter {
   constructor() {
     super();
     this.wss = null;
-    this.client = null;           // 연결된 AI 에이전트
+    this.client = null;           // Connected AI agent
     this.connected = false;
     this.port = 9320;
     this.heartbeatInterval = null;
@@ -33,19 +33,19 @@ class AIBridge extends EventEmitter {
   }
 
   /**
-   * WebSocket 서버 시작 — AI 에이전트가 여기에 접속
+   * Start WebSocket server -- AI agent connects here
    */
   start() {
     this.wss = new WebSocket.Server({ port: this.port, host: '127.0.0.1' });
 
     this.wss.on('connection', (ws) => {
-      console.log('[AI Bridge] AI 연결됨');
+      console.log('[AI Bridge] AI connected');
       this.client = ws;
       this.connected = true;
       this.reconnectAttempts = 0;
       this.emit('connected');
 
-      // AI에 현재 상태 전송
+      // Send current state to AI
       this.send('sync', this.petState);
 
       ws.on('message', (data) => {
@@ -53,22 +53,22 @@ class AIBridge extends EventEmitter {
           const msg = JSON.parse(data.toString());
           this._handleCommand(msg);
         } catch (err) {
-          console.error('[AI Bridge] 메시지 파싱 실패:', err);
+          console.error('[AI Bridge] Message parsing failed:', err);
         }
       });
 
       ws.on('close', () => {
-        console.log('[AI Bridge] AI 연결 해제');
+        console.log('[AI Bridge] AI disconnected');
         this.client = null;
         this.connected = false;
         this.emit('disconnected');
       });
 
       ws.on('error', (err) => {
-        console.error('[AI Bridge] WebSocket 오류:', err.message);
+        console.error('[AI Bridge] WebSocket error:', err.message);
       });
 
-      // 하트비트
+      // Heartbeat
       this.heartbeatInterval = setInterval(() => {
         if (this.connected) {
           this.send('heartbeat', { timestamp: Date.now() });
@@ -77,54 +77,54 @@ class AIBridge extends EventEmitter {
     });
 
     this.wss.on('error', (err) => {
-      console.error('[AI Bridge] 서버 오류:', err.message);
+      console.error('[AI Bridge] Server error:', err.message);
     });
 
-    console.log(`[AI Bridge] ws://127.0.0.1:${this.port} 에서 대기 중`);
+    console.log(`[AI Bridge] Listening on ws://127.0.0.1:${this.port}`);
   }
 
   /**
-   * AI에서 온 명령 처리
+   * Handle commands from AI
    */
   _handleCommand(msg) {
     const { type, payload } = msg;
 
     switch (type) {
-      // === 행동 제어 ===
+      // === Behavior Control ===
       case 'action':
-        // AI가 펫의 행동을 직접 지시
+        // AI directly commands pet behavior
         // payload: { state: 'walking'|'excited'|..., duration?: ms }
         this.emit('action', payload);
         break;
 
       case 'move':
-        // 특정 위치로 이동
+        // Move to specific position
         // payload: { x, y, speed? }
         this.emit('move', payload);
         break;
 
       case 'emote':
-        // 감정 표현
+        // Express emotion
         // payload: { emotion: 'happy'|'curious'|'sleepy'|... }
         this.emit('emote', payload);
         break;
 
-      // === 말하기 ===
+      // === Speech ===
       case 'speak':
-        // AI가 펫을 통해 사용자에게 말함
+        // AI speaks to user through the pet
         // payload: { text: string, style?: 'normal'|'thought'|'shout' }
         this.emit('speak', payload);
         break;
 
       case 'think':
-        // 생각 말풍선 (... 형태)
+        // Thought bubble (... form)
         // payload: { text: string }
         this.emit('think', payload);
         break;
 
-      // === 파일 작업 ===
+      // === File Operations ===
       case 'carry_file':
-        // 특정 파일을 집어들도록 지시
+        // Command to pick up specific file
         // payload: { fileName: string, targetX?: number }
         this.emit('carry_file', payload);
         break;
@@ -134,134 +134,134 @@ class AIBridge extends EventEmitter {
         break;
 
       case 'smart_file_op':
-        // 스마트 파일 조작 (텔레그램 또는 AI에서 트리거)
+        // Smart file operation (triggered by Telegram or AI)
         // payload: { phase: 'pick_up'|'drop'|'complete', fileName?, targetName?, ... }
         this.emit('smart_file_op', payload);
         break;
 
-      // === 외형 변화 ===
+      // === Appearance Changes ===
       case 'evolve':
-        // 진화 트리거
+        // Evolution trigger
         // payload: { stage: number }
         this.emit('evolve', payload);
         break;
 
       case 'set_mode':
-        // 모드 전환
+        // Mode switching
         // payload: { mode: 'pet'|'incarnation' }
         this.emit('set_mode', payload);
         break;
 
       case 'accessorize':
-        // 임시 악세사리 추가
+        // Add temporary accessory
         // payload: { type: string, duration?: ms }
         this.emit('accessorize', payload);
         break;
 
-      // === 공간 이동 명령 ===
+      // === Spatial Movement Commands ===
       case 'jump_to':
-        // 특정 위치로 점프
+        // Jump to specific position
         // payload: { x, y }
         this.emit('jump_to', payload);
         break;
 
       case 'rappel':
-        // 레펠 (천장/벽에서 실 타고 내려가기)
+        // Rappel (descend from ceiling/wall on thread)
         // payload: {}
         this.emit('rappel', payload);
         break;
 
       case 'release_thread':
-        // 레펠 실 해제 (낙하)
+        // Release rappel thread (fall)
         // payload: {}
         this.emit('release_thread', payload);
         break;
 
       case 'move_to_center':
-        // 화면 중앙으로 이동
+        // Move to screen center
         // payload: {}
         this.emit('move_to_center', payload);
         break;
 
       case 'walk_on_window':
-        // 특정 윈도우 타이틀바 위로 이동
+        // Move onto specific window title bar
         // payload: { windowId, x, y }
         this.emit('walk_on_window', payload);
         break;
 
       case 'query_windows':
-        // 윈도우 위치 정보 요청 → main process에서 처리
+        // Window position info request -> handled by main process
         this.emit('query_windows', payload);
         break;
 
-      // === 커스텀 이동 패턴 ===
+      // === Custom Movement Patterns ===
       case 'register_movement':
-        // AI가 커스텀 이동 패턴 등록
+        // AI registers custom movement pattern
         // payload: { name: string, definition: { type: 'waypoints'|'formula'|'sequence', ... } }
         this.emit('register_movement', payload);
         break;
 
       case 'custom_move':
-        // 등록된 커스텀 이동 패턴 실행
+        // Execute registered custom movement pattern
         // payload: { name: string, params?: object }
         this.emit('custom_move', payload);
         break;
 
       case 'stop_custom_move':
-        // 현재 커스텀 이동 강제 중지
+        // Force stop current custom movement
         // payload: {}
         this.emit('stop_custom_move', payload);
         break;
 
       case 'list_movements':
-        // 등록된 이동 패턴 목록 요청 → 응답은 renderer에서 reportToAI로 전송
+        // Request registered movement pattern list -> response sent via renderer's reportToAI
         // payload: {}
         this.emit('list_movements', payload);
         break;
 
-      // === 캐릭터 커스터마이징 ===
+      // === Character Customization ===
       case 'set_character':
-        // AI가 생성한 캐릭터 데이터 적용
+        // Apply AI-generated character data
         // payload: { colorMap?: {...}, frames?: {...} }
         this.emit('set_character', payload);
         break;
 
       case 'reset_character':
-        // 원래 캐릭터로 리셋
+        // Reset to default character
         this.emit('reset_character', payload);
         break;
 
       case 'set_persona':
-        // 봇 인격체 전환 (Incarnation 모드)
+        // Bot persona switching (Incarnation mode)
         // payload: { name, personality, speakingStyle, color?, ... }
         this.emit('set_persona', payload);
         break;
 
-      // === 컨텍스트 질의 ===
+      // === Context Queries ===
       case 'query_state':
-        // 현재 펫 상태 요청
+        // Request current pet state
         this.send('state_response', this.petState);
         break;
 
       case 'query_screen':
-        // 화면 정보 요청
+        // Request screen info
         this.emit('query_screen', payload);
         break;
 
-      // === AI 의사결정 결과 ===
+      // === AI Decision Result ===
       case 'ai_decision':
-        // AI의 종합적 의사결정
+        // AI's comprehensive decision
         // payload: { action, speech?, emotion?, reasoning? }
         this.emit('ai_decision', payload);
         break;
 
       default:
-        console.log(`[AI Bridge] 알 수 없는 명령: ${type}`);
+        console.log(`[AI Bridge] Unknown command: ${type}`);
     }
   }
 
   /**
-   * AI에 이벤트 전송
+   * Send event to AI
    */
   send(type, payload) {
     if (!this.client || this.client.readyState !== WebSocket.OPEN) return false;
@@ -273,7 +273,7 @@ class AIBridge extends EventEmitter {
     }
   }
 
-  // === 사용자 이벤트 리포트 (ClawMate → AI) ===
+  // === User Event Reports (ClawMate -> AI) ===
 
   reportUserClick(position) {
     this.send('user_event', {
@@ -335,8 +335,8 @@ class AIBridge extends EventEmitter {
   }
 
   /**
-   * 메트릭 데이터를 AI에 전송
-   * 렌더러에서 수집한 펫 동작 품질 메트릭을 AI에 전달
+   * Send metrics data to AI
+   * Forwards pet behavior quality metrics collected by renderer to AI
    */
   reportMetrics(summary) {
     this.send('metrics_report', {
@@ -345,7 +345,7 @@ class AIBridge extends EventEmitter {
     });
   }
 
-  // === 상태 업데이트 ===
+  // === State Updates ===
 
   updatePetState(updates) {
     Object.assign(this.petState, updates);

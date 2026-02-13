@@ -1,24 +1,24 @@
-// 캐릭터 크기 (16x16 픽셀 → 4배 확대)
+// Character size (16x16 pixels -> 4x scale)
 const PIXEL_SIZE = 4;
 const GRID_SIZE = 16;
 const CHAR_SIZE = PIXEL_SIZE * GRID_SIZE; // 64px
 
-// 이동 속도 (px/frame)
+// Movement speed (px/frame)
 const BASE_SPEED = 1.5;
 const CLIMB_SPEED = 1.0;
 
-// 말풍선
+// Speech bubble
 const SPEECH_CHAR_DELAY = 30;    // ms per character
-const SPEECH_DISPLAY_TIME = 5000; // ms 표시 유지
-const SPEECH_FADE_TIME = 500;     // ms 페이드 아웃
+const SPEECH_DISPLAY_TIME = 5000; // ms display duration
+const SPEECH_FADE_TIME = 500;     // ms fade out
 
-// 파일 작업 안전장치
+// File operation safeguards
 const MAX_FILES_PER_SESSION = 3;
-const FILE_MOVE_COOLDOWN = 5 * 60 * 1000; // 5분
+const FILE_MOVE_COOLDOWN = 5 * 60 * 1000; // 5 minutes
 const MAX_FILE_SIZE = 100 * 1024 * 1024;  // 100MB
 const EXCLUDED_EXTENSIONS = ['.exe', '.dll', '.sys', '.lnk', '.ini', '.bat', '.cmd', '.ps1'];
 
-// FSM 상태
+// FSM states
 const STATES = {
   IDLE: 'idle',
   WALKING: 'walking',
@@ -33,7 +33,7 @@ const STATES = {
   EXCITED: 'excited',
 };
 
-// 화면 가장자리
+// Screen edges
 const EDGES = {
   BOTTOM: 'bottom',
   LEFT: 'left',
@@ -41,13 +41,13 @@ const EDGES = {
   TOP: 'top',
 };
 
-// 방향
+// Directions
 const DIRECTIONS = {
   LEFT: -1,
   RIGHT: 1,
 };
 
-// 색상 팔레트
+// Color palette
 const COLORS = {
   pet: {
     primary: '#ff4f40',

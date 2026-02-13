@@ -1,9 +1,9 @@
 /**
- * 사용자 상호작용 기억 + 진화 시스템
+ * User interaction memory + evolution system
  *
- * - 클릭 횟수, 일수, 마일스톤 추적
- * - 진화 단계 관리: 항상 긍정적/귀여운 방향으로만 진화
- * - 무서운/끔찍한 모습으로는 절대 변하지 않음
+ * - Tracks click count, days, milestones
+ * - Evolution stage management: always evolves in positive/cute directions only
+ * - Never transforms into scary/creepy appearances
  */
 const Memory = (() => {
   let data = {
@@ -13,16 +13,16 @@ const Memory = (() => {
     lastVisitDate: null,
     milestones: [],
     evolutionStage: 0,
-    interactionStreak: 0,    // 연속 방문 일수
+    interactionStreak: 0,    // Consecutive visit days
 
-    // --- 모션 히스토리 ---
-    motionHistory: [],       // 최근 100개 상태 전환 기록 [{state, timestamp, duration}]
-    motionStats: {},         // 상태별 누적 시간 {idle: 12345, walking: 6789, ...}
+    // --- Motion history ---
+    motionHistory: [],       // Recent 100 state transition records [{state, timestamp, duration}]
+    motionStats: {},         // Accumulated time per state {idle: 12345, walking: 6789, ...}
 
-    // --- 유저 반응 저장 ---
-    reactionLog: [],         // 최근 50개 유저 반응 [{action, reaction, timestamp}]
-    favoriteActions: {},     // 행동별 긍정 반응 횟수 {excited: 5, walking: 2, ...}
-    dislikedActions: {},     // 행동별 부정 반응 횟수 (무시/이탈)
+    // --- User reaction storage ---
+    reactionLog: [],         // Recent 50 user reactions [{action, reaction, timestamp}]
+    favoriteActions: {},     // Positive reaction count per action {excited: 5, walking: 2, ...}
+    dislikedActions: {},     // Negative reaction count per action (ignored/abandoned)
   };
 
   let lastMotionState = null;
@@ -40,22 +40,22 @@ const Memory = (() => {
 
     evolutionStages = window._evolutionStages;
 
-    // 첫 실행
+    // First run
     if (!data.firstRunDate) {
       data.firstRunDate = new Date().toISOString();
       await save();
     }
 
-    // 일수 계산
+    // Calculate days
     updateDayCount();
 
-    // 마일스톤 체크
+    // Check milestones
     checkMilestones();
 
-    // 진화 체크
+    // Check evolution
     checkEvolution();
 
-    // 진화 시각 효과 적용
+    // Apply evolution visual effects
     applyEvolutionVisuals();
   }
 
@@ -64,7 +64,7 @@ const Memory = (() => {
     const now = new Date();
     data.totalDays = Math.floor((now - firstRun) / (1000 * 60 * 60 * 24));
 
-    // 연속 방문 체크
+    // Check consecutive visits
     const lastVisit = data.lastVisitDate ? new Date(data.lastVisitDate) : null;
     const today = now.toDateString();
     if (lastVisit && lastVisit.toDateString() !== today) {
@@ -103,7 +103,7 @@ const Memory = (() => {
         data.milestones.push(check.key);
         const msg = Speech.getMilestoneMessage(check.key);
         if (msg) {
-          // 약간의 딜레이 후 마일스톤 메시지 표시
+          // Display milestone message after a slight delay
           setTimeout(() => {
             Speech.show(msg);
             Interactions.spawnStarEffect();
@@ -114,9 +114,9 @@ const Memory = (() => {
   }
 
   /**
-   * 진화 단계 체크
-   * 항상 올라가기만 함 (퇴화 없음)
-   * 조건: 클릭 횟수 + 함께한 일수 모두 충족
+   * Check evolution stage
+   * Only goes up (no devolution)
+   * Condition: both click count and days together must be met
    */
   function checkEvolution() {
     if (!evolutionStages) return;
@@ -141,22 +141,22 @@ const Memory = (() => {
   }
 
   /**
-   * 진화 발생 시 이벤트
-   * - 밝은 플래시 효과 (부드러운 빛)
-   * - 반짝이 파티클
-   * - 축하 메시지
+   * Evolution event handler
+   * - Bright flash effect (soft light)
+   * - Sparkle particles
+   * - Congratulatory message
    */
   function onEvolution(prevStage, newStage) {
     const msgs = window._messages;
     const stageInfo = evolutionStages[newStage];
 
-    // 밝은 플래시 (무섭지 않은 부드러운 효과)
+    // Bright flash (soft, non-scary effect)
     const flash = document.createElement('div');
     flash.className = 'evolve-flash';
     document.body.appendChild(flash);
     setTimeout(() => flash.remove(), 600);
 
-    // 진화 반짝임 파티클 (밝은 색상만)
+    // Evolution sparkle particles (bright colors only)
     const pos = PetEngine.getPosition();
     const sparkleColors = ['#FFD700', '#FF69B4', '#87CEEB', '#98FB98', '#DDA0DD'];
     for (let i = 0; i < 16; i++) {
@@ -169,7 +169,7 @@ const Memory = (() => {
       setTimeout(() => sparkle.remove(), 800);
     }
 
-    // 진화 링 이펙트 (따뜻한 색)
+    // Evolution ring effect (warm colors)
     const ring = document.createElement('div');
     ring.className = 'evolve-ring';
     ring.style.width = '64px';
@@ -180,7 +180,7 @@ const Memory = (() => {
     document.getElementById('world').appendChild(ring);
     setTimeout(() => ring.remove(), 1000);
 
-    // 축하 메시지
+    // Congratulatory message
     if (msgs && msgs.evolution) {
       const evolveMsg = msgs.evolution[`stage_${newStage}`];
       if (evolveMsg) {
@@ -188,13 +188,13 @@ const Memory = (() => {
       }
     }
 
-    // 시각 효과 업데이트
+    // Update visual effects
     applyEvolutionVisuals();
   }
 
   /**
-   * 진화 단계에 따른 시각적 변화 적용
-   * 항상 긍정적: 밝아지고, 반짝이고, 귀여운 악세사리 추가
+   * Apply visual changes based on evolution stage
+   * Always positive: gets brighter, sparkly, and cute accessories added
    */
   function applyEvolutionVisuals() {
     if (!evolutionStages) return;
@@ -204,17 +204,17 @@ const Memory = (() => {
     const pet = document.getElementById('pet-container');
     if (!pet) return;
 
-    // 크기 스케일
+    // Size scale
     pet.style.transform = pet.style.transform || '';
 
-    // 밝기/채도 — 진화할수록 밝고 화사해짐
+    // Brightness/saturation -- gets brighter and more vibrant with evolution
     const { brightness, saturation } = stage.colorMod;
     const canvas = pet.querySelector('canvas');
     if (canvas) {
       canvas.style.filter = `brightness(${brightness}) saturate(${saturation})`;
     }
 
-    // 악세사리 제거 후 재적용
+    // Remove accessories then reapply
     pet.querySelectorAll('.accessory').forEach(a => a.remove());
 
     for (const acc of stage.accessories) {
@@ -223,8 +223,8 @@ const Memory = (() => {
   }
 
   /**
-   * 귀여운 악세사리 추가
-   * 모든 악세사리는 밝고 귀여운 요소만
+   * Add cute accessories
+   * All accessories are bright and cute elements only
    */
   function addAccessory(container, type) {
     const acc = document.createElement('div');
@@ -235,7 +235,7 @@ const Memory = (() => {
 
     switch (type) {
       case 'blush':
-        // 양 볼에 핑크 동그라미
+        // Pink circles on both cheeks
         acc.style.width = '8px';
         acc.style.height = '6px';
         acc.style.borderRadius = '50%';
@@ -243,14 +243,14 @@ const Memory = (() => {
         acc.style.left = '12px';
         acc.style.top = '38px';
         container.appendChild(acc);
-        // 오른쪽 볼
+        // Right cheek
         const blush2 = acc.cloneNode();
         blush2.style.left = '44px';
         container.appendChild(blush2);
         return;
 
       case 'sparkle_eyes':
-        // 눈에 반짝임 (흰색 작은 점)
+        // Eye sparkles (small white dots)
         acc.style.width = '3px';
         acc.style.height = '3px';
         acc.style.borderRadius = '50%';
@@ -300,14 +300,14 @@ const Memory = (() => {
         break;
 
       case 'wings':
-        // 작은 천사 날개 (왼쪽)
+        // Small angel wings (left)
         acc.textContent = '\u{1FABD}';
         acc.style.fontSize = '10px';
         acc.style.left = '-6px';
         acc.style.top = '20px';
         acc.style.opacity = '0.7';
         container.appendChild(acc);
-        // 오른쪽 날개
+        // Right wing
         const wing2 = acc.cloneNode(true);
         wing2.style.left = '58px';
         wing2.style.transform = 'scaleX(-1)';
@@ -318,30 +318,30 @@ const Memory = (() => {
     container.appendChild(acc);
   }
 
-  // --- 모션 히스토리 기록 ---
+  // --- Motion history recording ---
 
   /**
-   * 상태 전환 기록
-   * StateMachine에서 상태 변경 시 호출
+   * Record state transition
+   * Called when state changes in StateMachine
    */
   function recordMotion(newState) {
     const now = Date.now();
 
-    // 이전 상태의 지속 시간 계산 → 통계 누적
+    // Calculate previous state duration -> accumulate statistics
     if (lastMotionState && lastMotionTime > 0) {
       const duration = now - lastMotionTime;
       if (!data.motionStats[lastMotionState]) data.motionStats[lastMotionState] = 0;
       data.motionStats[lastMotionState] += duration;
     }
 
-    // 히스토리에 추가
+    // Add to history
     data.motionHistory.push({
       state: newState,
       timestamp: now,
       from: lastMotionState || 'init',
     });
 
-    // 최대 크기 초과 시 오래된 것 제거
+    // Remove old entries when exceeding max size
     if (data.motionHistory.length > MAX_MOTION_HISTORY) {
       data.motionHistory = data.motionHistory.slice(-MAX_MOTION_HISTORY);
     }
@@ -349,32 +349,32 @@ const Memory = (() => {
     lastMotionState = newState;
     lastMotionTime = now;
 
-    // 10회 전환마다 자동 저장
+    // Auto-save every 10 transitions
     if (data.motionHistory.length % 10 === 0) save();
   }
 
   /**
-   * 유저 반응 기록
-   * 특정 행동 중 사용자가 클릭/드래그 등의 반응을 보인 경우
+   * Record user reaction
+   * When user shows reactions like click/drag during a specific action
    *
-   * @param {string} action - 펫이 하고 있던 행동
+   * @param {string} action - Action the pet was performing
    * @param {string} reaction - 'click' | 'drag' | 'cursor_near' | 'triple_click' | 'double_click'
    */
   function recordReaction(action, reaction) {
     const now = Date.now();
 
-    // 반응 로그 추가
+    // Add to reaction log
     data.reactionLog.push({ action, reaction, timestamp: now });
     if (data.reactionLog.length > MAX_REACTION_LOG) {
       data.reactionLog = data.reactionLog.slice(-MAX_REACTION_LOG);
     }
 
-    // 클릭/더블클릭은 긍정 반응으로 분류
+    // Click/double-click classified as positive reactions
     if (reaction === 'click' || reaction === 'double_click' || reaction === 'cursor_near') {
       if (!data.favoriteActions[action]) data.favoriteActions[action] = 0;
       data.favoriteActions[action]++;
     }
-    // 드래그(잡아서 옮김)는 약간 부정 반응
+    // Drag (grab and move) is a slightly negative reaction
     if (reaction === 'drag') {
       if (!data.dislikedActions[action]) data.dislikedActions[action] = 0;
       data.dislikedActions[action]++;
@@ -384,8 +384,8 @@ const Memory = (() => {
   }
 
   /**
-   * 사용자 선호 행동 Top N 반환
-   * AI가 행동 결정 시 참고
+   * Return top N user-preferred actions
+   * Referenced by AI when deciding actions
    */
   function getFavoriteActions(topN = 5) {
     const entries = Object.entries(data.favoriteActions || {});
@@ -394,14 +394,14 @@ const Memory = (() => {
   }
 
   /**
-   * 최근 모션 히스토리 반환
+   * Return recent motion history
    */
   function getMotionHistory(limit = 20) {
     return (data.motionHistory || []).slice(-limit);
   }
 
   /**
-   * 상태별 누적 시간 반환
+   * Return accumulated time per state
    */
   function getMotionStats() {
     return { ...(data.motionStats || {}) };

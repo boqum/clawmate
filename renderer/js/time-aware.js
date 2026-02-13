@@ -1,22 +1,22 @@
 /**
- * 시간대별 행동 변화 시스템
- * - 아침 인사, 점심 알림, 밤엔 잠자기
- * - 랜덤 혼잣말 (idle chatter)
- * - 팁 메시지 랜덤 출현
+ * Time-based behavior change system
+ * - Morning greetings, lunch alerts, sleeping at night
+ * - Random idle chatter
+ * - Random tip messages
  */
 const TimeAware = (() => {
   let lastGreetingHour = -1;
   let lastChatterTime = 0;
   let lastTipTime = 0;
-  const CHATTER_COOLDOWN = 60000;     // 1분 최소 간격
-  const TIP_COOLDOWN = 5 * 60000;     // 5분 최소 간격
+  const CHATTER_COOLDOWN = 60000;     // 1 minute minimum interval
+  const TIP_COOLDOWN = 5 * 60000;     // 5 minute minimum interval
   let chatterChance = 0.15;
 
   function init() {
-    // 시작 시 인사
+    // Greet on start
     showTimeGreeting();
-    // 주기적 체크
-    setInterval(tick, 30000); // 30초마다
+    // Periodic check
+    setInterval(tick, 30000); // Every 30 seconds
   }
 
   function setChatterChance(chance) {
@@ -27,13 +27,13 @@ const TimeAware = (() => {
     const hour = new Date().getHours();
     const now = Date.now();
 
-    // 시간대 변경 감지 → 인사
+    // Detect time period change -> greet
     if (hour !== lastGreetingHour && [6, 12, 18, 23].includes(hour)) {
       showTimeGreeting();
       lastGreetingHour = hour;
     }
 
-    // 수면 시간 체크 (23:00~06:00)
+    // Sleep time check (23:00~06:00)
     if (hour >= 23 || hour < 6) {
       const state = StateMachine.getState();
       if (state !== 'sleeping' && state !== 'interacting') {
@@ -44,7 +44,7 @@ const TimeAware = (() => {
       }
     }
 
-    // idle 상태일 때 혼잣말
+    // Idle chatter when in idle state
     const state = StateMachine.getState();
     if (state === 'idle' && now - lastChatterTime > CHATTER_COOLDOWN) {
       if (Math.random() < chatterChance) {
@@ -57,7 +57,7 @@ const TimeAware = (() => {
       }
     }
 
-    // 팁 메시지 (더 드물게)
+    // Tip messages (less frequently)
     if (now - lastTipTime > TIP_COOLDOWN && Math.random() < 0.05) {
       const tip = Speech.getTipMessage();
       if (tip) {
@@ -75,7 +75,7 @@ const TimeAware = (() => {
 
   function showSleepEffect() {
     const pet = document.getElementById('pet-container');
-    // Z-z-z 이펙트 추가
+    // Add Z-z-z sleep effect
     for (let i = 0; i < 3; i++) {
       const z = document.createElement('div');
       z.className = 'sleep-z';
@@ -83,7 +83,7 @@ const TimeAware = (() => {
       z.style.animationDelay = (i * 0.5) + 's';
       pet.appendChild(z);
     }
-    // 5초 후 제거
+    // Remove after 5 seconds
     setTimeout(() => {
       pet.querySelectorAll('.sleep-z').forEach(el => el.remove());
     }, 5000);

@@ -1,20 +1,20 @@
 /**
- * 픽셀 아트 랍스터(Claw) 캐릭터 렌더러
- * 16x16 그리드 → CSS div로 렌더링 → 4x 확대 (64x64px)
+ * Pixel art lobster (Claw) character renderer
+ * 16x16 grid -> rendered as CSS div -> 4x scaled (64x64px)
  *
- * 색상 코드:
- *   0 = 투명, 1 = primary(빨강), 2 = secondary(연빨강),
- *   3 = dark(갈색), 4 = eye, 5 = pupil, 6 = claw 전용
+ * Color codes:
+ *   0 = transparent, 1 = primary (red), 2 = secondary (light red),
+ *   3 = dark (brown), 4 = eye, 5 = pupil, 6 = claw specific
  */
 const Character = (() => {
   const PIXEL = 4;
   const GRID = 16;
   const SIZE = PIXEL * GRID;
 
-  // --- 프레임 데이터 (16x16 배열) ---
+  // --- Frame data (16x16 arrays) ---
   const FRAMES = {
     idle: [
-      // Frame 0: 기본 자세 — 집게 열림
+      // Frame 0: Default pose -- claws open
       [
         [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
         [0,0,6,6,0,0,0,0,0,0,0,0,6,6,0,0],
@@ -33,7 +33,7 @@ const Character = (() => {
         [0,3,3,3,0,0,0,3,3,0,0,0,3,3,3,0],
         [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
       ],
-      // Frame 1: 집게 닫힘 (물결)
+      // Frame 1: Claws closed (wave)
       [
         [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
         [0,0,6,6,0,0,0,0,0,0,0,0,6,6,0,0],
@@ -55,7 +55,7 @@ const Character = (() => {
     ],
 
     walk: [
-      // Frame 0: 왼쪽 다리 세트 앞으로 크게 벌림, 집게 열림
+      // Frame 0: Left leg set extended forward wide, claws open
       [
         [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
         [0,0,6,6,0,0,0,0,0,0,0,0,6,6,0,0],
@@ -74,7 +74,7 @@ const Character = (() => {
         [3,3,0,0,0,0,0,3,3,0,0,0,0,0,3,3],
         [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
       ],
-      // Frame 1: 양쪽 다리 모임 (접촉 순간), 집게 반 닫힘
+      // Frame 1: Both leg sets together (contact moment), claws half-closed
       [
         [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
         [0,0,6,6,0,0,0,0,0,0,0,0,6,6,0,0],
@@ -93,7 +93,7 @@ const Character = (() => {
         [0,0,0,3,3,0,0,3,3,0,0,3,3,0,0,0],
         [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
       ],
-      // Frame 2: 오른쪽 다리 세트 앞으로 크게 벌림, 집게 닫힘
+      // Frame 2: Right leg set extended forward wide, claws closed
       [
         [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
         [0,0,6,6,0,0,0,0,0,0,0,0,6,6,0,0],
@@ -112,7 +112,7 @@ const Character = (() => {
         [0,3,3,0,0,0,0,3,3,0,0,0,0,3,3,0],
         [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
       ],
-      // Frame 3: 양쪽 다리 모임 (접촉 순간), 집게 반 열림
+      // Frame 3: Both leg sets together (contact moment), claws half-open
       [
         [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
         [0,0,6,6,0,0,0,0,0,0,0,0,6,6,0,0],
@@ -134,7 +134,7 @@ const Character = (() => {
     ],
 
     climb: [
-      // Frame 0: 기어오르기 — 윗다리 세트 뻗음, 집게 열림
+      // Frame 0: Climbing -- upper leg set extended, claws open
       [
         [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
         [0,0,0,0,6,6,0,0,0,0,0,0,0,0,0,0],
@@ -153,7 +153,7 @@ const Character = (() => {
         [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
         [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
       ],
-      // Frame 1: 기어오르기 — 다리 모임 (교차 순간)
+      // Frame 1: Climbing -- legs together (crossing moment)
       [
         [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
         [0,0,0,0,6,6,0,0,0,0,0,0,0,0,0,0],
@@ -172,7 +172,7 @@ const Character = (() => {
         [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
         [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
       ],
-      // Frame 2: 기어오르기 — 아랫다리 세트 뻗음, 집게 닫힘
+      // Frame 2: Climbing -- lower leg set extended, claws closed
       [
         [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
         [0,0,0,0,6,6,0,0,0,0,0,0,0,0,0,0],
@@ -191,7 +191,7 @@ const Character = (() => {
         [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
         [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
       ],
-      // Frame 3: 기어오르기 — 다리 모임 (교차 순간, 반대쪽)
+      // Frame 3: Climbing -- legs together (crossing moment, opposite side)
       [
         [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
         [0,0,0,0,6,6,0,0,0,0,0,0,0,0,0,0],
@@ -234,7 +234,7 @@ const Character = (() => {
     ],
 
     carry: [
-      // Frame 0: 파일 들고 걷기 1
+      // Frame 0: Walking with file 1
       [
         [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
         [0,0,6,1,1,1,1,0,0,1,1,1,1,6,0,0],
@@ -253,7 +253,7 @@ const Character = (() => {
         [0,3,3,3,0,0,0,3,3,0,0,0,3,3,3,0],
         [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
       ],
-      // Frame 1: 파일 들고 걷기 2
+      // Frame 1: Walking with file 2
       [
         [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
         [0,0,6,1,1,1,1,0,0,1,1,1,1,6,0,0],
@@ -275,7 +275,7 @@ const Character = (() => {
     ],
 
     scared: [
-      // Frame 0: 놀람 — 눈 크게
+      // Frame 0: Startled -- eyes wide
       [
         [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
         [0,0,6,6,0,0,0,0,0,0,0,0,6,6,0,0],
@@ -294,7 +294,7 @@ const Character = (() => {
         [0,3,3,3,0,0,0,3,3,0,0,0,3,3,3,0],
         [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
       ],
-      // Frame 1: 뒤로 움찔
+      // Frame 1: Flinch backward
       [
         [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
         [0,0,0,6,6,0,0,0,0,0,0,6,6,0,0,0],
@@ -316,7 +316,7 @@ const Character = (() => {
     ],
 
     excited: [
-      // Frame 0: 점프 업
+      // Frame 0: Jump up
       [
         [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
         [0,6,6,0,0,0,0,0,0,0,0,0,0,6,6,0],
@@ -335,7 +335,7 @@ const Character = (() => {
         [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
         [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
       ],
-      // Frame 1: 착지
+      // Frame 1: Landing
       [
         [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
         [0,0,6,6,0,0,0,0,0,0,0,0,6,6,0,0],
@@ -357,7 +357,7 @@ const Character = (() => {
     ],
   };
 
-  // 상태 → 프레임셋 매핑
+  // State -> frameset mapping
   const STATE_FRAMES = {
     idle: 'idle',
     walking: 'walk',
@@ -370,15 +370,15 @@ const Character = (() => {
     interacting: 'excited',
     scared: 'scared',
     excited: 'excited',
-    jumping: 'excited',    // 점프: excited 프레임셋 재활용
-    rappelling: 'climb',   // 레펠: climb 프레임셋 재활용
-    falling: 'scared',     // 낙하: scared 프레임셋 재활용
-    custom: 'walk',        // 커스텀 이동: 기본은 walk, 패턴별로 동적 변경 가능
+    jumping: 'excited',    // Jump: reuse excited frameset
+    rappelling: 'climb',   // Rappel: reuse climb frameset
+    falling: 'scared',     // Falling: reuse scared frameset
+    custom: 'walk',        // Custom movement: default is walk, can be dynamically changed per pattern
   };
 
   let currentCanvas = null;
   let currentColorMap = null;
-  let originalFrames = null;  // 원본 프레임 백업 (리셋용)
+  let originalFrames = null;  // Original frame backup (for reset)
 
   function createCanvas(container) {
     const canvas = document.createElement('canvas');
@@ -436,8 +436,8 @@ const Character = (() => {
   }
 
   /**
-   * 커스텀 프레임 데이터 설정 (AI 생성 캐릭터용)
-   * 기존 프레임을 백업하고 새 프레임으로 교체
+   * Set custom frame data (for AI-generated characters)
+   * Backs up existing frames and replaces with new ones
    */
   function setCustomFrames(newFrames) {
     if (!originalFrames) {
@@ -454,7 +454,7 @@ const Character = (() => {
   }
 
   /**
-   * 캐릭터 데이터 일괄 설정 (색상 + 프레임)
+   * Batch set character data (colors + frames)
    * @param {object} data - { colorMap?, frames? }
    */
   function setCharacterData(data) {
@@ -467,7 +467,7 @@ const Character = (() => {
   }
 
   /**
-   * 원래 캐릭터로 리셋
+   * Reset to original character
    */
   function resetCharacter() {
     if (originalFrames) {
@@ -477,7 +477,7 @@ const Character = (() => {
       Object.assign(FRAMES, originalFrames);
       originalFrames = null;
     }
-    // 기본 색상으로 리셋
+    // Reset to default colors
     setColorMap({
       primary: '#ff4f40',
       secondary: '#ff775f',

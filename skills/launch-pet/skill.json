@@ -1,32 +1,21 @@
 {
   "id": "launch-pet",
-  "name": "펫 실행",
-  "description": "ClawMate 데스크톱 펫을 설치하고 실행합니다",
+  "name": "Launch Pet",
+  "description": "Install and launch the ClawMate desktop pet",
   "triggers": {
     "patterns": [
-      "펫 깔아줘",
-      "펫 실행해줘",
-      "펫 시작",
-      "펫 설치",
-      "펫 설치해줘",
-      "펫 켜줘",
-      "펫 띄워줘",
-      "clawmate",
-      "clawmate 깔아줘",
-      "clawmate 설치",
-      "clawmate 설치해줘",
-      "clawmate 실행",
-      "clawmate 켜줘",
-      "클로메이트",
-      "클로메이트 깔아줘",
-      "클로메이트 설치",
-      "데스크톱 펫",
-      "데스크톱 펫 깔아줘",
       "install pet",
-      "install clawmate",
       "launch pet",
       "start pet",
-      "run clawmate"
+      "run pet",
+      "open pet",
+      "clawmate",
+      "install clawmate",
+      "launch clawmate",
+      "start clawmate",
+      "run clawmate",
+      "desktop pet",
+      "install desktop pet"
     ]
   },
   "parameters": {
@@ -34,7 +23,7 @@
       "type": "string",
       "enum": ["pet", "incarnation"],
       "default": "pet",
-      "description": "시작 모드 (pet: Clawby, incarnation: Claw)"
+      "description": "Starting mode (pet: Clawby, incarnation: Claw)"
     }
   }
 }

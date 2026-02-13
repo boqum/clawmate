@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <title>ClawMate Launcher</title>
@@ -12,27 +12,27 @@
         <span class="claw-icon">\u{1F99E}</span>
       </div>
       <h1>ClawMate</h1>
-      <p class="subtitle">데스크톱 위의 살아있는 Claw</p>
+      <p class="subtitle">A living Claw on your desktop</p>
     </div>
 
     <div class="launcher-body">
       <div class="mode-card" id="mode-pet" onclick="selectMode('pet')">
         <div class="mode-icon">\u{1F990}</div>
         <h2>Clawby</h2>
-        <p>귀여운 동반자</p>
-        <span class="mode-desc">장난기 넘치는 꼬마 랍스터가 바탕화면을 돌아다녀요!</span>
+        <p>Cute companion</p>
+        <span class="mode-desc">A playful little lobster roaming your desktop!</span>
       </div>
 
       <div class="mode-card" id="mode-incarnation" onclick="selectMode('incarnation')">
         <div class="mode-icon">\u{1F980}</div>
         <h2>Claw</h2>
-        <p>육체를 얻은 존재</p>
-        <span class="mode-desc">침착하고 대담한 Claw가 바탕화면에 강림합니다.</span>
+        <p>An entity given physical form</p>
+        <span class="mode-desc">The calm and bold Claw descends upon your desktop.</span>
       </div>
     </div>
 
     <button class="start-btn" id="start-btn" disabled onclick="startPet()">
-      모드를 선택해주세요
+      Select a mode
     </button>
   </div>
 
@@ -45,7 +45,7 @@
       document.getElementById('mode-' + mode).classList.add('selected');
       const btn = document.getElementById('start-btn');
       btn.disabled = false;
-      btn.textContent = mode === 'pet' ? 'Clawby 시작!' : 'Claw 각성!';
+      btn.textContent = mode === 'pet' ? 'Start Clawby!' : 'Awaken Claw!';
     }
 
     async function startPet() {

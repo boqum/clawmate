@@ -1,27 +1,27 @@
 /**
- * AI 행동 컨트롤러
+ * AI Behavior Controller
  *
- * AI가 연결되면 → AI가 모든 행동을 결정
- * AI가 끊기면  → 자율 모드 (기존 FSM) 로 폴백
+ * When AI is connected -> AI decides all behaviors
+ * When AI disconnects -> Falls back to autonomous mode (existing FSM)
  *
- * AI가 결정하는 것:
- * - 언제 뭐라고 말할지
- * - 어디로 움직일지
- * - 어떤 감정을 표현할지
- * - 파일을 집을지 말지
- * - 사용자 행동에 어떻게 반응할지
+ * AI decides:
+ * - When and what to say
+ * - Where to move
+ * - What emotions to express
+ * - Whether to pick up files
+ * - How to react to user actions
  */
 const AIController = (() => {
   let connected = false;
-  let autonomousMode = true;  // AI 미연결 시 자율 모드
+  let autonomousMode = true;  // Autonomous mode when AI is not connected
   let pendingDecision = null;
   let lastAIAction = 0;
 
-  // AI 연결 상태에 따라 preload를 통해 IPC로 통신
-  // (main 프로세스의 AIBridge가 WebSocket 관리)
+  // Communicates via IPC through preload based on AI connection status
+  // (AIBridge in main process manages WebSocket)
 
   function init() {
-    // main 프로세스에서 AI 명령이 오면 실행
+    // Execute when AI commands arrive from the main process
     if (window.clawmate.onAICommand) {
       window.clawmate.onAICommand((command) => {
         handleAICommand(command);
@@ -32,7 +32,7 @@ const AIController = (() => {
       window.clawmate.onAIConnected(() => {
         connected = true;
         autonomousMode = false;
-        Speech.show('AI 연결됨... 의식이 깨어난다.');
+        Speech.show('AI connected... consciousness awakens.');
         StateMachine.forceState('excited');
       });
     }
@@ -41,13 +41,13 @@ const AIController = (() => {
       window.clawmate.onAIDisconnected(() => {
         connected = false;
         autonomousMode = true;
-        Speech.show('...혼자가 됐다. 알아서 놀아야지!');
+        Speech.show('...left alone. Gotta keep myself entertained!');
       });
     }
   }
 
   /**
-   * AI로부터 온 명령 실행
+   * Execute commands received from AI
    */
   function handleAICommand(command) {
     const { type, payload } = command;
@@ -84,12 +84,12 @@ const AIController = (() => {
 
       case 'carry_file':
         StateMachine.forceState('carrying');
-        Speech.show(`${payload.fileName} 집었다!`);
+        Speech.show(`Grabbed ${payload.fileName}!`);
         break;
 
       case 'drop_file':
         StateMachine.forceState('idle');
-        Speech.show('내려놨다!');
+        Speech.show('Dropped it!');
         break;
 
       case 'set_mode':
@@ -97,64 +97,64 @@ const AIController = (() => {
         break;
 
       case 'evolve':
-        // AI가 직접 진화 결정
+        // AI directly decides evolution
         if (typeof Memory !== 'undefined') {
-          Speech.show(window._messages?.evolution?.[`stage_${payload.stage}`] || '변하고 있어...!');
+          Speech.show(window._messages?.evolution?.[`stage_${payload.stage}`] || 'I\'m changing...!');
         }
         break;
 
       case 'accessorize':
-        // 임시 악세사리
+        // Temporary accessory
         break;
 
       case 'ai_decision':
-        // 종합 의사결정 — 여러 행동을 순서대로 실행
+        // Comprehensive decision -- execute multiple actions in sequence
         executeDecision(payload);
         break;
 
-      // === 공간 이동 명령 ===
+      // === Spatial movement commands ===
 
       case 'jump_to':
-        // 특정 위치로 점프
+        // Jump to a specific position
         // payload: { x, y }
         PetEngine.jumpTo(payload.x, payload.y);
         break;
 
       case 'rappel':
-        // 레펠 시작 (천장/벽에서 실 타고 내려가기)
+        // Start rappelling (descend on a thread from ceiling/wall)
         PetEngine.startRappel();
         break;
 
       case 'release_thread':
-        // 레펠 실 해제 (낙하)
+        // Release rappel thread (free fall)
         PetEngine.releaseThread();
         break;
 
       case 'move_to_center':
-        // 화면 중앙으로 이동 (물리적 방법으로)
+        // Move to screen center (using physics-based methods)
         PetEngine.moveToCenter();
         break;
 
       case 'walk_on_window':
-        // 특정 윈도우 타이틀바 위로 이동
+        // Move onto a specific window's title bar
         // payload: { windowId, x, y }
         PetEngine.jumpTo(payload.x, payload.y);
         break;
 
-      // === 커스텀 이동 패턴 ===
+      // === Custom movement patterns ===
 
       case 'register_movement':
-        // AI가 JSON으로 이동 패턴 정의를 보내면 등록
+        // Register movement pattern definition sent by AI as JSON
         // payload: { name, definition }
-        // definition: { type, params } — 각 타입별 파라미터
+        // definition: { type, params } -- parameters per type
         _registerAIMovement(payload.name, payload.definition);
         break;
 
       case 'custom_move':
-        // 등록된 커스텀 이동 패턴 실행
+        // Execute a registered custom movement pattern
         // payload: { name, params? }
         if (!PetEngine.executeCustomMovement(payload.name, payload.params || {})) {
-          // 실행 실패 시 AI에 알림
+          // Notify AI on execution failure
           if (window.clawmate.reportToAI) {
             window.clawmate.reportToAI('custom_move_failed', {
               name: payload.name,
@@ -165,12 +165,12 @@ const AIController = (() => {
         break;
 
       case 'stop_custom_move':
-        // 현재 커스텀 이동 강제 중지
+        // Force stop current custom movement
         PetEngine.stopCustomMovement();
         break;
 
       case 'list_movements':
-        // 등록된 이동 패턴 목록 요청
+        // Request list of registered movement patterns
         if (window.clawmate.reportToAI) {
           window.clawmate.reportToAI('movement_list', {
             movements: PetEngine.getRegisteredMovements(),
@@ -178,14 +178,14 @@ const AIController = (() => {
         }
         break;
 
-      // === 캐릭터 커스터마이징 ===
+      // === Character customization ===
       case 'set_character':
-        // AI가 생성한 새 캐릭터 데이터 적용
+        // Apply new character data generated by AI
         Character.setCharacterData(payload);
         if (payload.speech) {
           Speech.show(payload.speech);
         } else {
-          Speech.show('변신 완료!');
+          Speech.show('Transformation complete!');
         }
         StateMachine.forceState('excited');
         setTimeout(() => {
@@ -194,24 +194,24 @@ const AIController = (() => {
         break;
 
       case 'reset_character':
-        // 원래 캐릭터로 복원
+        // Restore to original character
         Character.resetCharacter();
-        Speech.show('원래 모습으로 돌아왔어!');
+        Speech.show('Back to my original form!');
         StateMachine.forceState('excited');
         break;
 
-      // === 인격체 전환 (Incarnation 모드) ===
+      // === Persona switching (Incarnation mode) ===
       case 'set_persona':
-        // 봇 인격체 데이터 적용
+        // Apply bot persona data
         if (typeof ModeManager !== 'undefined') {
           ModeManager.setPersona(payload);
           const name = payload.name || 'Claw';
-          Speech.show(`${name}의 인격이 깨어났다.`);
+          Speech.show(`${name}'s persona has awakened.`);
           StateMachine.forceState('excited');
         }
         break;
 
-      // === 스마트 파일 조작 애니메이션 ===
+      // === Smart file operation animations ===
       case 'smart_file_op':
         handleSmartFileOp(payload);
         break;
@@ -219,111 +219,111 @@ const AIController = (() => {
   }
 
   /**
-   * 스마트 파일 조작 애니메이션 처리
+   * Handle smart file operation animations
    *
-   * 텔레그램이나 AI에서 트리거된 파일 이동 작업의
-   * 각 단계(phase)에 따라 펫 애니메이션을 순차 실행.
+   * Sequentially execute pet animations for each phase
+   * of file move operations triggered by Telegram or AI.
    *
    * phase:
-   *   - start: 작업 시작, 총 파일 수 표시
-   *   - pick_up: 파일 집어들기 (carrying 상태 + 말풍선)
-   *   - drop: 파일 내려놓기 (걷기 상태 + 말풍선)
-   *   - complete: 완료 (excited 상태 + 결과 말풍선)
-   *   - error: 오류 (scared 상태 + 에러 말풍선)
+   *   - start: Operation begins, show total file count
+   *   - pick_up: Pick up file (carrying state + speech bubble)
+   *   - drop: Drop file (walking state + speech bubble)
+   *   - complete: Done (excited state + result speech bubble)
+   *   - error: Error (scared state + error speech bubble)
    */
   function handleSmartFileOp(payload) {
     switch (payload.phase) {
       case 'start':
         StateMachine.forceState('excited');
-        Speech.show(`${payload.totalFiles}개 파일 정리 시작!`);
+        Speech.show(`Starting to organize ${payload.totalFiles} files!`);
         break;
 
       case 'pick_up':
-        // 펫이 파일 위치로 이동 (화면 내 랜덤 위치)
+        // Move pet to file location (random position on screen)
         _smartFileJumpToSource(payload.index);
-        // 집어들기 애니메이션
+        // Pick up animation
         setTimeout(() => {
           StateMachine.forceState('carrying');
-          Speech.show(`${payload.fileName} 집었다!`);
+          Speech.show(`Grabbed ${payload.fileName}!`);
         }, 400);
         break;
 
       case 'drop':
-        // 대상 폴더 위치로 이동
+        // Move to target folder location
         _smartFileJumpToTarget(payload.index);
-        // 내려놓기 애니메이션
+        // Drop animation
         setTimeout(() => {
           StateMachine.forceState('walking');
-          Speech.show(`여기! (${payload.targetName})`);
+          Speech.show(`Here! (${payload.targetName})`);
         }, 400);
         break;
 
       case 'complete':
         StateMachine.forceState('excited');
         if (payload.movedCount > 0) {
-          Speech.show(`${payload.movedCount}개 파일 옮겼어!`);
+          Speech.show(`Moved ${payload.movedCount} files!`);
         } else {
-          Speech.show('옮길 파일이 없었어!');
+          Speech.show('No files to move!');
         }
         break;
 
       case 'error':
         StateMachine.forceState('scared');
-        Speech.show('앗, 뭔가 잘못됐어...');
+        Speech.show('Oops, something went wrong...');
         break;
     }
   }
 
   /**
-   * 파일 집어들기 위치로 점프
-   * 파일 인덱스에 따라 화면 좌측 영역의 다른 위치로 이동
+   * Jump to file pickup location
+   * Move to different positions in the left area of the screen based on file index
    */
   function _smartFileJumpToSource(index) {
     const screenW = window.innerWidth;
     const screenH = window.innerHeight;
-    // 화면 왼쪽 1/3 영역에서 세로 위치를 파일 인덱스에 따라 분산
+    // Distribute vertical positions within the left 1/3 of the screen based on file index
     const targetX = screenW * 0.1 + (index % 3) * 50;
     const targetY = screenH * 0.3 + ((index * 80) % (screenH * 0.5));
     PetEngine.jumpTo(targetX, targetY);
   }
 
   /**
-   * 파일 내려놓기 위치로 점프
-   * 화면 오른쪽 영역으로 이동
+   * Jump to file drop location
+   * Move to the right area of the screen
    */
   function _smartFileJumpToTarget(index) {
     const screenW = window.innerWidth;
     const screenH = window.innerHeight;
-    // 화면 오른쪽 1/3 영역
+    // Right 1/3 area of the screen
     const targetX = screenW * 0.7 + (index % 3) * 50;
     const targetY = screenH * 0.4 + ((index * 60) % (screenH * 0.4));
     PetEngine.jumpTo(targetX, targetY);
   }
 
   /**
-   * AI가 JSON으로 정의한 이동 패턴을 동적으로 등록
-   * 안전한 실행을 위해 Function 생성자 대신 사전정의된 행동 유형 조합 사용
+   * Dynamically register movement patterns defined by AI as JSON
+   * Uses predefined behavior type combinations instead of Function constructor for safe execution
    *
-   * definition 형식:
+   * definition format:
    * {
    *   type: 'waypoints' | 'formula' | 'sequence',
-   *   waypoints?: [{x, y, pause?}],          // waypoints 타입
-   *   formula?: { xExpr, yExpr },             // formula 타입 (sin, cos 기반)
-   *   sequence?: ['zigzag', 'shake', ...],    // sequence 타입 (기존 패턴 순차 실행)
+   *   waypoints?: [{x, y, pause?}],          // waypoints type
+   *   formula?: { xExpr, yExpr },             // formula type (sin, cos based)
+   *   sequence?: ['zigzag', 'shake', ...],    // sequence type (execute existing patterns sequentially)
    *   duration?: number,
    *   speed?: number,
    * }
    */
   function _registerAIMovement(name, definition) {
     if (!name || !definition || !definition.type) {
-      console.warn('[AIController] 이동 패턴 등록 실패: name, definition.type 필수');
+      console.warn('[AIController] Movement pattern registration failed: name and definition.type required');
       return;
     }
 
     let handler;
 
     switch (definition.type) {
-      // 웨이포인트 타입: 지정된 좌표들을 순서대로 이동
+      // Waypoints type: move through specified coordinates in order
       case 'waypoints':
         handler = {
           init(params) {
@@ -340,7 +340,7 @@ const AIController = (() => {
 
             const wp = state.waypoints[state.currentIdx];
 
-            // 웨이포인트에서 멈춤 중
+            // Pausing at waypoint
             if (state.pausing) {
               state.pauseTime -= dt;
               if (state.pauseTime <= 0) {
@@ -355,7 +355,7 @@ const AIController = (() => {
             const dist = Math.hypot(dx, dy);
 
             if (dist < 5) {
-              // 웨이포인트 도달
+              // Waypoint reached
               if (wp.pause && wp.pause > 0) {
                 state.pausing = true;
                 state.pauseTime = wp.pause;
@@ -377,7 +377,7 @@ const AIController = (() => {
         };
         break;
 
-      // 수식 타입: sin/cos 기반 수학적 궤도
+      // Formula type: mathematical trajectory based on sin/cos
       case 'formula':
         handler = {
           init(params) {
@@ -409,7 +409,7 @@ const AIController = (() => {
         };
         break;
 
-      // 시퀀스 타입: 기존 등록된 패턴들을 순차 실행
+      // Sequence type: execute existing registered patterns sequentially
       case 'sequence':
         handler = {
           init(params) {
@@ -424,7 +424,7 @@ const AIController = (() => {
 
             if (!state.subStarted) {
               const subName = state.sequence[state.currentIdx];
-              // 서브 패턴을 직접 실행하지 않고 상태만 추적
+              // Track state only without directly executing sub-patterns
               PetEngine.executeCustomMovement(subName, {
                 x: ctx.x, y: ctx.y,
                 screenW: ctx.screenW, screenH: ctx.screenH,
@@ -440,24 +440,24 @@ const AIController = (() => {
         break;
 
       default:
-        console.warn(`[AIController] 알 수 없는 이동 패턴 타입: ${definition.type}`);
+        console.warn(`[AIController] Unknown movement pattern type: ${definition.type}`);
         return;
     }
 
     PetEngine.registerMovement(name, handler);
-    console.log(`[AIController] AI 이동 패턴 등록됨: ${name} (${definition.type})`);
+    console.log(`[AIController] AI movement pattern registered: ${name} (${definition.type})`);
   }
 
   /**
-   * AI 종합 의사결정 실행
-   * AI가 상황을 분석하고 내린 복합적 결정
+   * Execute AI comprehensive decision
+   * A complex decision made by AI after analyzing the situation
    *
-   * 예시:
+   * Example:
    * {
    *   action: 'walking',
-   *   speech: '오늘 바탕화면이 좀 어지럽네...',
+   *   speech: 'The desktop looks a bit messy today...',
    *   emotion: 'curious',
-   *   reasoning: '바탕화면 파일이 15개 이상 감지됨'
+   *   reasoning: 'Detected 15+ files on desktop'
    * }
    */
   function executeDecision(decision) {
@@ -474,7 +474,7 @@ const AIController = (() => {
     }
 
     if (decision.moveTo) {
-      // 이동 방법에 따라 다른 물리 동작 사용
+      // Use different physics-based movement depending on method
       if (decision.moveTo.method === 'jump') {
         PetEngine.jumpTo(decision.moveTo.x, decision.moveTo.y);
       } else if (decision.moveTo.method === 'rappel') {
@@ -488,7 +488,7 @@ const AIController = (() => {
   }
 
   /**
-   * 감정 → 행동 매핑
+   * Emotion -> behavior mapping
    */
   function applyEmotion(emotion) {
     const emotionMap = {
@@ -507,7 +507,7 @@ const AIController = (() => {
     StateMachine.forceState(state);
   }
 
-  // === 사용자 이벤트 → AI에 리포트 ===
+  // === User events -> Report to AI ===
 
   function reportClick(position) {
     if (window.clawmate.reportToAI) {

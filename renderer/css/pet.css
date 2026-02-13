@@ -1,4 +1,4 @@
-/* 레펠 실(thread) SVG 레이어 */
+/* Rappel thread SVG layer */
 #thread-svg {
   position: absolute;
   top: 0;
@@ -9,7 +9,7 @@
   z-index: 999;
 }
 
-/* 펫 컨테이너 */
+/* Pet container */
 #pet-container {
   position: absolute;
   width: 64px;
@@ -25,7 +25,7 @@
   image-rendering: crisp-edges;
 }
 
-/* 수면 Z 이펙트 */
+/* Sleep Z effect */
 .sleep-z {
   position: absolute;
   top: -20px;
@@ -57,7 +57,7 @@
   100% { opacity: 0; transform: translateY(-20px) translateX(10px); }
 }
 
-/* 흥분 별 이펙트 */
+/* Excitement star effect */
 .star-effect {
   position: absolute;
   width: 8px;
@@ -74,7 +74,7 @@
   100% { opacity: 0; transform: scale(0.5) translateY(-20px); }
 }
 
-/* 하트 이펙트 (상호작용) */
+/* Heart effect (interaction) */
 .heart-effect {
   position: absolute;
   font-size: 16px;
@@ -88,7 +88,7 @@
   100% { opacity: 0; transform: translateY(-40px) scale(1.2); }
 }
 
-/* 진화 반짝임 이펙트 */
+/* Evolution sparkle effect */
 .evolve-sparkle {
   position: absolute;
   width: 6px;
@@ -104,13 +104,13 @@
   100% { opacity: 0; transform: scale(0) rotate(360deg); }
 }
 
-/* 드래그 중 상태 */
+/* Dragging state */
 #pet-container.dragging {
   cursor: grabbing;
   filter: brightness(1.1);
 }
 
-/* 모드별 글로우 효과 */
+/* Mode-specific glow effect */
 #pet-container.mode-incarnation canvas {
   filter: drop-shadow(0 0 4px rgba(0, 191, 165, 0.6));
 }

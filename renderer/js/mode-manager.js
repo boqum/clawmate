@@ -1,5 +1,5 @@
 /**
- * Pet ↔ Incarnation 모드 전환 관리
+ * Pet <-> Incarnation mode switching manager
  */
 const ModeManager = (() => {
   let currentMode = 'pet';
@@ -22,17 +22,17 @@ const ModeManager = (() => {
     const p = personalities[mode];
     if (!p) return;
 
-    // Incarnation 모드: 활성 인격체가 있으면 반영
+    // Incarnation mode: reflect active persona if available
     const persona = (mode === 'incarnation' && window._persona)
       ? window._persona.getActivePersona()
       : null;
 
-    // 캐릭터 색상 업데이트
+    // Update character colors
     let colors;
     if (mode === 'pet') {
       colors = { primary: '#ff4f40', secondary: '#ff775f', dark: '#8B4513', eye: '#ffffff', pupil: '#111111', claw: '#ff4f40' };
     } else if (persona?.color) {
-      // 인격체 커스텀 색상
+      // Persona custom colors
       colors = {
         primary: persona.color.primary || '#ff4f40',
         secondary: persona.color.secondary || '#ff775f',
@@ -46,17 +46,17 @@ const ModeManager = (() => {
     }
     Character.setColorMap(colors);
 
-    // 속도 조정 (인격체 우선)
+    // Speed adjustment (persona takes priority)
     PetEngine.setSpeedMultiplier(persona?.speedMultiplier ?? p.speedMultiplier);
 
-    // CSS 클래스
+    // CSS classes
     pet.classList.remove('mode-pet', 'mode-incarnation');
     pet.classList.add(`mode-${mode}`);
 
-    // 말풍선 스타일
+    // Speech bubble style
     Speech.setMode(mode);
 
-    // 성격 적용 (인격체가 있으면 병합)
+    // Apply personality (merge with persona if available)
     if (persona) {
       StateMachine.setPersonality({
         ...p,
@@ -70,12 +70,12 @@ const ModeManager = (() => {
   }
 
   /**
-   * 인격체 변경 (Incarnation 모드에서 봇 전환 시)
+   * Change persona (when switching bots in Incarnation mode)
    */
   function setPersona(personaData) {
     if (window._persona) {
       window._persona.setActivePersona(personaData);
-      // 현재 Incarnation 모드면 즉시 반영
+      // Apply immediately if currently in Incarnation mode
       if (currentMode === 'incarnation') {
         applyMode('incarnation');
       }
@@ -93,8 +93,8 @@ const ModeManager = (() => {
     applyMode(newMode);
     spawnTransitionEffect(newMode);
     Speech.show(newMode === 'pet'
-      ? 'Clawby 모드로 변신!'
-      : 'Claw... 각성했다.');
+      ? 'Transformed into Clawby mode!'
+      : 'Claw... has awakened.');
   }
 
   function spawnTransitionEffect(mode) {
@@ -102,7 +102,7 @@ const ModeManager = (() => {
     const color = mode === 'pet' ? '#ff4f40' : '#00BFA5';
     const world = document.getElementById('world');
 
-    // 파티클 버스트
+    // Particle burst
     for (let i = 0; i < 12; i++) {
       const p = document.createElement('div');
       p.className = 'mode-transition-particle';
