@@ -1,0 +1,87 @@
+/* 파티클 및 전환 효과 */
+
+/* 모드 전환 파티클 */
+.mode-transition-particle {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  animation: particle-burst 0.8s ease-out forwards;
+  pointer-events: none;
+}
+
+@keyframes particle-burst {
+  0% {
+    opacity: 1;
+    transform: translate(0, 0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--px), var(--py)) scale(0);
+  }
+}
+
+/* 진화 글로우 링 */
+.evolve-ring {
+  position: absolute;
+  border-radius: 50%;
+  border: 2px solid;
+  animation: ring-expand 1s ease-out forwards;
+  pointer-events: none;
+}
+
+@keyframes ring-expand {
+  0% {
+    opacity: 1;
+    transform: scale(0.5);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(3);
+  }
+}
+
+/* 파일 픽업 이펙트 */
+.file-pickup-effect {
+  position: absolute;
+  font-size: 12px;
+  color: #ff4f40;
+  font-weight: bold;
+  animation: pickup-float 1s ease-out forwards;
+  pointer-events: none;
+  user-select: none;
+}
+
+@keyframes pickup-float {
+  0% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-30px); }
+}
+
+/* 꼬리 흔들기 (idle 상태 추가 효과) */
+.tail-wag {
+  animation: wag 0.5s ease-in-out infinite alternate;
+}
+
+@keyframes wag {
+  0% { transform: rotate(-5deg); }
+  100% { transform: rotate(5deg); }
+}
+
+/* 진화 단계 전환 — 밝은 플래시 */
+.evolve-flash {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: white;
+  animation: flash-in-out 0.6s ease forwards;
+  pointer-events: none;
+  z-index: 9999;
+}
+
+@keyframes flash-in-out {
+  0% { opacity: 0; }
+  30% { opacity: 0.3; }
+  100% { opacity: 0; }
+}

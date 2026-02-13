@@ -1,0 +1,109 @@
+/* 펫 컨테이너 */
+#pet-container {
+  position: absolute;
+  width: 64px;
+  height: 64px;
+  transition: transform 0.1s ease;
+  image-rendering: pixelated;
+  z-index: 1000;
+}
+
+#pet-container canvas {
+  display: block;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+/* 수면 Z 이펙트 */
+.sleep-z {
+  position: absolute;
+  top: -20px;
+  right: -10px;
+  font-size: 14px;
+  color: #888;
+  animation: float-z 2s ease-in-out infinite;
+  pointer-events: none;
+  user-select: none;
+}
+
+.sleep-z:nth-child(2) {
+  top: -35px;
+  right: -5px;
+  font-size: 18px;
+  animation-delay: 0.5s;
+}
+
+.sleep-z:nth-child(3) {
+  top: -50px;
+  right: 0px;
+  font-size: 22px;
+  animation-delay: 1s;
+}
+
+@keyframes float-z {
+  0% { opacity: 0; transform: translateY(0) translateX(0); }
+  30% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-20px) translateX(10px); }
+}
+
+/* 흥분 별 이펙트 */
+.star-effect {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background: #FFD700;
+  clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+  animation: star-pop 0.6s ease-out forwards;
+  pointer-events: none;
+}
+
+@keyframes star-pop {
+  0% { opacity: 1; transform: scale(0); }
+  50% { opacity: 1; transform: scale(1.5); }
+  100% { opacity: 0; transform: scale(0.5) translateY(-20px); }
+}
+
+/* 하트 이펙트 (상호작용) */
+.heart-effect {
+  position: absolute;
+  font-size: 16px;
+  animation: heart-float 1s ease-out forwards;
+  pointer-events: none;
+  user-select: none;
+}
+
+@keyframes heart-float {
+  0% { opacity: 1; transform: translateY(0) scale(0.5); }
+  100% { opacity: 0; transform: translateY(-40px) scale(1.2); }
+}
+
+/* 진화 반짝임 이펙트 */
+.evolve-sparkle {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  animation: sparkle-pop 0.8s ease-out forwards;
+  pointer-events: none;
+}
+
+@keyframes sparkle-pop {
+  0% { opacity: 1; transform: scale(0) rotate(0deg); }
+  50% { opacity: 1; transform: scale(1.5) rotate(180deg); }
+  100% { opacity: 0; transform: scale(0) rotate(360deg); }
+}
+
+/* 드래그 중 상태 */
+#pet-container.dragging {
+  cursor: grabbing;
+  filter: brightness(1.1);
+}
+
+/* 모드별 글로우 효과 */
+#pet-container.mode-incarnation canvas {
+  filter: drop-shadow(0 0 4px rgba(0, 191, 165, 0.6));
+}
+
+#pet-container.mode-pet canvas {
+  filter: drop-shadow(0 0 2px rgba(255, 79, 64, 0.3));
+}

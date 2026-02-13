@@ -1,0 +1,23 @@
+appId: dev.openclaw.clawmate
+productName: ClawMate
+directories:
+  output: dist
+files:
+  - main/**/*
+  - preload/**/*
+  - renderer/**/*
+  - shared/**/*
+  - assets/**/*
+win:
+  target:
+    - nsis
+    - portable
+  icon: assets/icons/clawmate.ico
+nsis:
+  oneClick: true
+  allowToChangeInstallationDirectory: false
+mac:
+  target:
+    - dmg
+  icon: assets/icons/clawmate.icns
+  category: public.app-category.entertainment

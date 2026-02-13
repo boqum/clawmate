@@ -1,0 +1,72 @@
+/* 말풍선 공통 */
+.speech-bubble {
+  position: absolute;
+  padding: 8px 14px;
+  font-family: 'Segoe UI', 'Apple SD Gothic Neo', sans-serif;
+  font-size: 13px;
+  line-height: 1.4;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 2000;
+  animation: speech-appear 0.2s ease-out;
+  max-width: 220px;
+  white-space: normal;
+  word-break: keep-all;
+}
+
+.speech-bubble::after {
+  content: '';
+  position: absolute;
+  bottom: -8px;
+  left: 30px;
+  width: 0;
+  height: 0;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+}
+
+/* Pet 모드 말풍선 — 둥글고 빨간 테두리 */
+.speech-pet {
+  background: #fff5f5;
+  border: 2px solid #ff4f40;
+  border-radius: 16px;
+  color: #333;
+  box-shadow: 0 2px 8px rgba(255, 79, 64, 0.15);
+}
+
+.speech-pet::after {
+  border-top: 8px solid #ff4f40;
+}
+
+/* Incarnation 모드 말풍선 — 각지고 틸 발광 */
+.speech-incarnation {
+  background: #f0fffd;
+  border: 2px solid #00BFA5;
+  border-radius: 4px;
+  color: #1a1a2e;
+  box-shadow: 0 0 12px rgba(0, 191, 165, 0.3);
+}
+
+.speech-incarnation::after {
+  border-top: 8px solid #00BFA5;
+}
+
+/* 타자기 커서 효과 */
+.speech-text {
+  display: inline;
+}
+
+/* 페이드 아웃 */
+.speech-fade {
+  animation: speech-disappear 0.5s ease-in forwards;
+}
+
+@keyframes speech-appear {
+  0% { opacity: 0; transform: translateY(5px) scale(0.9); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes speech-disappear {
+  0% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(0.9) translateY(-5px); }
+}

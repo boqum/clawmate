@@ -1,0 +1,15 @@
+{
+  "id": "clawmate",
+  "name": "ClawMate",
+  "description": "OpenClaw 데스크톱 펫 - 화면 위의 살아있는 Claw",
+  "version": "1.0.0",
+  "skills": ["skills/launch-pet"],
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "mode": { "enum": ["pet", "incarnation"], "default": "pet" },
+      "fileInteraction": { "type": "boolean", "default": true },
+      "soundEnabled": { "type": "boolean", "default": false }
+    }
+  }
+}

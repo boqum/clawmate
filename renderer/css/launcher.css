@@ -1,0 +1,127 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Segoe UI', 'Apple SD Gothic Neo', sans-serif;
+  background: transparent;
+  overflow: hidden;
+  user-select: none;
+}
+
+.launcher {
+  width: 360px;
+  padding: 24px;
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+}
+
+.launcher-header {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.logo {
+  font-size: 36px;
+  margin-bottom: 8px;
+}
+
+.launcher-header h1 {
+  font-size: 22px;
+  color: #1a1a2e;
+  font-weight: 700;
+}
+
+.subtitle {
+  color: #888;
+  font-size: 13px;
+  margin-top: 4px;
+}
+
+.launcher-body {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.mode-card {
+  flex: 1;
+  padding: 16px 12px;
+  border: 2px solid #e0e0e0;
+  border-radius: 12px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.mode-card:hover {
+  border-color: #ccc;
+  background: #fafafa;
+}
+
+.mode-card.selected {
+  border-color: #ff4f40;
+  background: #fff5f5;
+  box-shadow: 0 0 0 3px rgba(255, 79, 64, 0.15);
+}
+
+#mode-incarnation.selected {
+  border-color: #00BFA5;
+  background: #f0fffd;
+  box-shadow: 0 0 0 3px rgba(0, 191, 165, 0.15);
+}
+
+.mode-icon {
+  font-size: 32px;
+  margin-bottom: 8px;
+}
+
+.mode-card h2 {
+  font-size: 15px;
+  color: #1a1a2e;
+  margin-bottom: 2px;
+}
+
+.mode-card p {
+  font-size: 11px;
+  color: #888;
+  margin-bottom: 6px;
+}
+
+.mode-desc {
+  font-size: 11px;
+  color: #666;
+  line-height: 1.4;
+}
+
+.start-btn {
+  width: 100%;
+  padding: 12px;
+  border: none;
+  border-radius: 10px;
+  background: #ff4f40;
+  color: white;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.start-btn:disabled {
+  background: #ddd;
+  color: #999;
+  cursor: not-allowed;
+}
+
+.start-btn:not(:disabled):hover {
+  background: #e63e30;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(255, 79, 64, 0.3);
+}
+
+.start-btn:not(:disabled):active {
+  transform: translateY(0);
+}

@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>ClawMate Launcher</title>
+  <link rel="stylesheet" href="css/launcher.css">
+</head>
+<body>
+  <div class="launcher">
+    <div class="launcher-header">
+      <div class="logo">
+        <span class="claw-icon">\u{1F99E}</span>
+      </div>
+      <h1>ClawMate</h1>
+      <p class="subtitle">데스크톱 위의 살아있는 Claw</p>
+    </div>
+
+    <div class="launcher-body">
+      <div class="mode-card" id="mode-pet" onclick="selectMode('pet')">
+        <div class="mode-icon">\u{1F990}</div>
+        <h2>Clawby</h2>
+        <p>귀여운 동반자</p>
+        <span class="mode-desc">장난기 넘치는 꼬마 랍스터가 바탕화면을 돌아다녀요!</span>
+      </div>
+
+      <div class="mode-card" id="mode-incarnation" onclick="selectMode('incarnation')">
+        <div class="mode-icon">\u{1F980}</div>
+        <h2>OpenClaw</h2>
+        <p>육체를 얻은 존재</p>
+        <span class="mode-desc">침착하고 대담한 OpenClaw이 바탕화면에 강림합니다.</span>
+      </div>
+    </div>
+
+    <button class="start-btn" id="start-btn" disabled onclick="startPet()">
+      모드를 선택해주세요
+    </button>
+  </div>
+
+  <script>
+    let selectedMode = null;
+
+    function selectMode(mode) {
+      selectedMode = mode;
+      document.querySelectorAll('.mode-card').forEach(c => c.classList.remove('selected'));
+      document.getElementById('mode-' + mode).classList.add('selected');
+      const btn = document.getElementById('start-btn');
+      btn.disabled = false;
+      btn.textContent = mode === 'pet' ? 'Clawby 시작!' : 'OpenClaw 각성!';
+    }
+
+    async function startPet() {
+      if (!selectedMode) return;
+      await window.clawmate.setMode(selectedMode);
+      window.close();
+    }
+  </script>
+</body>
+</html>

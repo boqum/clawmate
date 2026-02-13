@@ -1,0 +1,22 @@
+{
+  "name": "clawmate",
+  "version": "1.0.0",
+  "description": "OpenClaw 데스크톱 펫 - 화면 위의 살아있는 Claw",
+  "main": "main/index.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder",
+    "build:win": "electron-builder --win",
+    "build:mac": "electron-builder --mac"
+  },
+  "keywords": ["openclaw", "desktop-pet", "electron", "clawmate"],
+  "author": "OpenClaw",
+  "license": "MIT",
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0"
+  }
+}
