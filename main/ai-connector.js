@@ -95,6 +95,11 @@ class OpenClawConnector extends EventEmitter {
         this.emit('window_positions', payload);
         break;
 
+      case 'metrics_report':
+        // 메트릭 데이터 수신 → OpenClaw AI가 분석
+        this.emit('metrics_report', payload);
+        break;
+
       case 'heartbeat':
         break;
     }
@@ -197,6 +202,74 @@ class OpenClawConnector extends EventEmitter {
     return this._send('query_windows', {});
   }
 
+  // === 커스텀 이동 패턴 API ===
+
+  /**
+   * 커스텀 이동 패턴 등록
+   * ClawMate에 새로운 이동 패턴을 동적으로 추가
+   *
+   * @param {string} name - 패턴 이름 (예: 'figure8', 'spiral')
+   * @param {object} definition - 패턴 정의
+   *   type: 'waypoints' | 'formula' | 'sequence'
+   *   waypoints?: [{x, y, pause?}]      — 웨이포인트 순차 이동
+   *   formula?: { xAmp, yAmp, xFreq, yFreq, xPhase, yPhase }  — 수학 궤도
+   *   sequence?: ['zigzag', 'shake']     — 기존 패턴 순차 실행
+   *   duration?: number                  — 지속 시간 (ms, formula 타입)
+   *   speed?: number                     — 이동 속도
+   *
+   * 사용 예:
+   *   connector.registerMovement('figure8', {
+   *     type: 'formula',
+   *     formula: { xAmp: 80, yAmp: 40, xFreq: 1, yFreq: 2 },
+   *     duration: 4000,
+   *   });
+   */
+  registerMovement(name, definition) {
+    return this._send('register_movement', { name, definition });
+  }
+
+  /**
+   * 등록된 커스텀 이동 패턴 실행
+   *
+   * @param {string} name - 실행할 패턴 이름
+   *   사전 등록 패턴: 'zigzag', 'patrol', 'circle', 'shake', 'dance'
+   *   또는 registerMovement()로 등록한 커스텀 패턴
+   * @param {object} params - 실행 파라미터 (패턴별로 다름)
+   *
+   * 사용 예:
+   *   connector.customMove('zigzag', { distance: 200, amplitude: 30 });
+   *   connector.customMove('patrol', { pointAX: 100, pointBX: 500, laps: 5 });
+   *   connector.customMove('shake', { intensity: 6, duration: 1000 });
+   */
+  customMove(name, params = {}) {
+    return this._send('custom_move', { name, params });
+  }
+
+  /** 현재 실행 중인 커스텀 이동 강제 중지 */
+  stopCustomMove() {
+    return this._send('stop_custom_move', {});
+  }
+
+  /** 등록된 이동 패턴 목록 요청 (응답은 user_event로 수신) */
+  listMovements() {
+    return this._send('list_movements', {});
+  }
+
+  /** 스마트 파일 조작 명령 전송 */
+  smartFileOp(payload) {
+    return this._send('smart_file_op', payload);
+  }
+
+  /** 캐릭터 데이터 전송 (AI 생성 캐릭터 적용) */
+  setCharacter(data) {
+    return this._send('set_character', data);
+  }
+
+  /** 원래 캐릭터로 리셋 */
+  resetCharacter() {
+    return this._send('reset_character', {});
+  }
+
   /**
    * 현재 펫 상태 요청 (Promise 반환)
    * 서버에서 state_response가 오면 resolve, 타임아웃 시 캐시된 상태 반환
@@ -232,6 +305,11 @@ class OpenClawConnector extends EventEmitter {
   /** 사용자 이벤트 리스너 등록 */
   onUserEvent(callback) {
     this.on('user_event', callback);
+  }
+
+  /** 메트릭 리포트 리스너 등록 */
+  onMetrics(callback) {
+    this.on('metrics_report', callback);
   }
 
   disconnect() {

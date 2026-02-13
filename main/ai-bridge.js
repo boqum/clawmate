@@ -133,6 +133,12 @@ class AIBridge extends EventEmitter {
         this.emit('drop_file', payload);
         break;
 
+      case 'smart_file_op':
+        // 스마트 파일 조작 (텔레그램 또는 AI에서 트리거)
+        // payload: { phase: 'pick_up'|'drop'|'complete', fileName?, targetName?, ... }
+        this.emit('smart_file_op', payload);
+        break;
+
       // === 외형 변화 ===
       case 'evolve':
         // 진화 트리거
@@ -186,6 +192,43 @@ class AIBridge extends EventEmitter {
       case 'query_windows':
         // 윈도우 위치 정보 요청 → main process에서 처리
         this.emit('query_windows', payload);
+        break;
+
+      // === 커스텀 이동 패턴 ===
+      case 'register_movement':
+        // OpenClaw이 커스텀 이동 패턴 등록
+        // payload: { name: string, definition: { type: 'waypoints'|'formula'|'sequence', ... } }
+        this.emit('register_movement', payload);
+        break;
+
+      case 'custom_move':
+        // 등록된 커스텀 이동 패턴 실행
+        // payload: { name: string, params?: object }
+        this.emit('custom_move', payload);
+        break;
+
+      case 'stop_custom_move':
+        // 현재 커스텀 이동 강제 중지
+        // payload: {}
+        this.emit('stop_custom_move', payload);
+        break;
+
+      case 'list_movements':
+        // 등록된 이동 패턴 목록 요청 → 응답은 renderer에서 reportToAI로 전송
+        // payload: {}
+        this.emit('list_movements', payload);
+        break;
+
+      // === 캐릭터 커스터마이징 ===
+      case 'set_character':
+        // AI가 생성한 캐릭터 데이터 적용
+        // payload: { colorMap?: {...}, frames?: {...} }
+        this.emit('set_character', payload);
+        break;
+
+      case 'reset_character':
+        // 원래 캐릭터로 리셋
+        this.emit('reset_character', payload);
         break;
 
       // === 컨텍스트 질의 ===
@@ -281,6 +324,17 @@ class AIBridge extends EventEmitter {
       image: imageBase64,
       width,
       height,
+      timestamp: Date.now(),
+    });
+  }
+
+  /**
+   * 메트릭 데이터를 OpenClaw에 전송
+   * 렌더러에서 수집한 펫 동작 품질 메트릭을 AI에 전달
+   */
+  reportMetrics(summary) {
+    this.send('metrics_report', {
+      metrics: summary,
       timestamp: Date.now(),
     });
   }

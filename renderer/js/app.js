@@ -71,6 +71,16 @@
   // 시간 인식 초기화 (자율 모드에서만 주도적으로 동작)
   TimeAware.init();
 
+  // 메트릭 수집기 초기화 (선택적 — 없어도 앱 정상 동작)
+  if (typeof Metrics !== 'undefined') {
+    Metrics.init();
+  }
+
+  // 브라우저 감시 초기화 (참견쟁이 모드)
+  if (typeof BrowserWatcher !== 'undefined') {
+    BrowserWatcher.init();
+  }
+
   // 엔진 시작
   PetEngine.start();
 

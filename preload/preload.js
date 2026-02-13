@@ -62,4 +62,20 @@ contextBridge.exposeInMainWorld('clawmate', {
 
   // AI 연결 상태 확인
   isAIConnected: () => ipcRenderer.invoke('is-ai-connected'),
+
+  // 메트릭 보고 (렌더러 → main → OpenClaw)
+  reportMetrics: (summary) => ipcRenderer.send('report-metrics', summary),
+
+  // 활성 윈도우 제목 조회 (브라우저 감시)
+  getActiveWindowTitle: () => ipcRenderer.invoke('get-active-window-title'),
+
+  // 커서 위치 조회 (화면 좌표)
+  getCursorPosition: () => ipcRenderer.invoke('get-cursor-position'),
+
+  // === 스마트 파일 조작 ===
+  parseFileCommand: (text) => ipcRenderer.invoke('parse-file-command', text),
+  listFilteredFiles: (sourceDir, filter) => ipcRenderer.invoke('list-filtered-files', sourceDir, filter),
+  smartFileOp: (command) => ipcRenderer.invoke('smart-file-op', command),
+  undoSmartMove: (moveId) => ipcRenderer.invoke('undo-smart-move', moveId),
+  undoAllSmartMoves: () => ipcRenderer.invoke('undo-all-smart-moves'),
 });

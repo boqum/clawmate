@@ -213,4 +213,51 @@ async function getWindowPositionsLinux() {
   }
 }
 
-module.exports = { getDesktopPath, getTrayIconExt, isWindows, isMac, isLinux, platform, getWindowPositions };
+/**
+ * 현재 포커스된 (최상위) 윈도우의 제목 반환
+ * 브라우저 탭 제목을 감지하여 펫이 참견할 수 있게 함
+ */
+async function getActiveWindowTitle() {
+  try {
+    if (platform === 'win32') {
+      const psScript = `
+Add-Type @"
+using System;
+using System.Runtime.InteropServices;
+using System.Text;
+public class FGWin {
+  [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
+  [DllImport("user32.dll")] static extern int GetWindowText(IntPtr hWnd, StringBuilder text, int count);
+  public static string Get() {
+    IntPtr h = GetForegroundWindow();
+    StringBuilder sb = new StringBuilder(512);
+    GetWindowText(h, sb, 512);
+    return sb.ToString();
+  }
+}
+"@
+[FGWin]::Get()
+`.trim();
+      const { stdout } = await execAsync(
+        `powershell -NoProfile -Command -`,
+        { input: psScript, timeout: 3000, encoding: 'utf-8' }
+      );
+      return (stdout || '').trim();
+    } else if (platform === 'darwin') {
+      const { stdout } = await execAsync(
+        `osascript -e 'tell application "System Events" to get name of first window of (first process whose frontmost is true)'`,
+        { timeout: 3000, encoding: 'utf-8' }
+      );
+      return (stdout || '').trim();
+    } else {
+      const { stdout } = await execAsync('xdotool getactivewindow getwindowname', {
+        timeout: 3000, encoding: 'utf-8',
+      });
+      return (stdout || '').trim();
+    }
+  } catch {
+    return '';
+  }
+}
+
+module.exports = { getDesktopPath, getTrayIconExt, isWindows, isMac, isLinux, platform, getWindowPositions, getActiveWindowTitle };

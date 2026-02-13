@@ -3,10 +3,12 @@ const path = require('path');
 const { setupTray } = require('./tray');
 const { registerIpcHandlers } = require('./ipc-handlers');
 const { AIBridge } = require('./ai-bridge');
+const { TelegramBot } = require('./telegram');
 
 let mainWindow = null;
 let launcherWindow = null;
 let aiBridge = null;
+let telegramBot = null;
 
 function createMainWindow() {
   const { width, height } = screen.getPrimaryDisplay().workAreaSize;
@@ -80,6 +82,12 @@ function startAIBridge(win) {
     'accessorize', 'ai_decision',
     // 공간 이동 명령 (OpenClaw이 집처럼 돌아다니기)
     'jump_to', 'rappel', 'release_thread', 'move_to_center', 'walk_on_window',
+    // 커스텀 이동 패턴
+    'register_movement', 'custom_move', 'stop_custom_move', 'list_movements',
+    // 스마트 파일 조작 (텔레그램/AI에서 트리거한 파일 이동 애니메이션)
+    'smart_file_op',
+    // 캐릭터 커스터마이징 (텔레그램에서 AI 생성)
+    'set_character', 'reset_character',
   ];
 
   commandTypes.forEach((type) => {
@@ -149,6 +157,9 @@ app.whenReady().then(() => {
   const bridge = startAIBridge(win);
   setupTray(win, bridge);
 
+  // 텔레그램 봇 초기화 (토큰 없으면 조용히 무시)
+  telegramBot = new TelegramBot(bridge);
+
   // 최초 설치 시 자동 시작 등록
   const { enableAutoStart, isAutoStartEnabled } = require('./autostart');
   if (!isAutoStartEnabled()) {
@@ -165,6 +176,7 @@ app.on('window-all-closed', () => {
 });
 
 app.on('before-quit', () => {
+  if (telegramBot) telegramBot.stop();
   if (aiBridge) aiBridge.stop();
 });
 

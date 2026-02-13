@@ -12,12 +12,11 @@ const PetEngine = (() => {
   // --- 물리 상수 ---
   const GRAVITY = 0.3;        // 중력 가속도 (px/frame^2)
   const STEP_SIZE = 4;        // 한 걸음 크기 (px)
-  const STEP_PAUSE = 80;      // 걸음 사이 멈춤 시간 (ms)
   const JUMP_VX = 3;          // 점프 수평 초기 속도
   const JUMP_VY = -7;         // 점프 수직 초기 속도 (위로)
   const BOUNCE_FACTOR = 0.3;  // 착지 바운스 계수
   const CHAR_SIZE = 64;       // 캐릭터 크기 (px)
-  const ANIM_INTERVAL = 200;  // 애니메이션 프레임 전환 간격 (ms)
+  const ANIM_INTERVAL = 150;  // 애니메이션 프레임 전환 간격 (ms) — 부드러운 전환
   const THREAD_SPEED = 0.8;   // 레펠 하강 속도 (px/frame)
 
   // --- 위치 및 속도 ---
@@ -28,6 +27,10 @@ const PetEngine = (() => {
   let edge = 'bottom';        // 현재 부착된 가장자리 (bottom, left, right, top, surface)
   let direction = 1;           // 이동 방향: 1=오른쪽/아래, -1=왼쪽/위
   let flipX = false;           // 캐릭터 좌우 반전 여부
+  let prevFlipX = false;       // 이전 프레임 flipX (전환 감지용)
+  let flipTransition = 0;      // flipX 전환 진행도 (0~1, 1이면 완료)
+  const FLIP_DURATION = 120;   // flipX 전환 시간 (ms)
+  let flipStartTime = 0;       // flipX 전환 시작 시각
   let screenW, screenH;
 
   // --- 엔진 상태 ---
@@ -36,14 +39,13 @@ const PetEngine = (() => {
   let speedMultiplier = 1.0;
   let animFrame = 0;
   let lastAnimTime = 0;
+  let animFrameChanged = false;  // 애니메이션 프레임 전환 플래그 (이동과 동기화)
 
   // --- 이동 모드 ---
   let movementMode = 'crawling';  // crawling | jumping | falling | rappelling
   let onSurface = true;           // 표면 위에 있는지 여부
 
-  // --- 스텝 시스템 (뚝뚝 끊어 걷기) ---
-  let stepPhase = 'move';     // 'move' 또는 'pause'
-  let lastStepTime = 0;
+  // --- 스텝 시스템 (애니메이션 프레임 동기화) ---
 
   // --- 레펠(thread) 시스템 ---
   // 부착점에서 실을 내려 진자운동하며 하강
@@ -113,6 +115,25 @@ const PetEngine = (() => {
 
   function updateVisual() {
     if (!petContainer) return;
+
+    // --- flipX 부드러운 전환 처리 ---
+    if (flipX !== prevFlipX) {
+      // 방향이 바뀌었으면 전환 시작
+      flipStartTime = Date.now();
+      flipTransition = 0;
+      prevFlipX = flipX;
+    }
+    if (flipTransition < 1) {
+      const elapsed = Date.now() - flipStartTime;
+      flipTransition = Math.min(1, elapsed / FLIP_DURATION);
+    }
+
+    // 전환 중일 때 CSS transition 적용
+    if (flipTransition < 1) {
+      petContainer.style.transition = `transform ${FLIP_DURATION}ms ease-in-out`;
+    } else {
+      petContainer.style.transition = 'none';
+    }
 
     let renderX = x;
     let renderY = y;
@@ -200,22 +221,17 @@ const PetEngine = (() => {
   // ===================================
 
   /**
-   * 스텝 이동: STEP_SIZE만큼 이동 → STEP_PAUSE만큼 멈춤 반복
-   * 한 발자국씩 끊어서 기어가는 느낌을 줌
+   * 스텝 이동: 애니메이션 프레임 전환 시에만 한 걸음 이동
+   * 다리 움직임(프레임 변화)과 실제 위치 이동이 1:1 동기화되어
+   * 다리가 움직일 때만 몸이 이동하는 자연스러운 보행 구현
    *
    * @param {number} stepScale - 스텝 크기 배율 (0.6 = 짐 들고 느리게, 1.0 = 기본)
-   * @param {number} now       - 현재 시각 (Date.now())
    */
-  function stepMove(stepScale, now) {
-    // 멈춤 단계: 아직 대기 시간이 남았으면 아무것도 안 함
-    if (stepPhase === 'pause') {
-      if (now - lastStepTime >= STEP_PAUSE) {
-        stepPhase = 'move';
-      }
-      return;
-    }
+  function stepMove(stepScale) {
+    // 애니메이션 프레임이 바뀌지 않았으면 이동 안 함
+    if (!animFrameChanged) return;
 
-    // 이동 단계: 한 걸음 전진
+    // 한 걸음 전진
     const stepDist = STEP_SIZE * stepScale * speedMultiplier;
 
     if (edge === 'bottom' || edge === 'top' || edge === 'surface') {
@@ -229,10 +245,6 @@ const PetEngine = (() => {
       // 오른쪽 벽: y축 이동
       y += stepDist * direction;
     }
-
-    // 한 걸음 완료, 멈춤 단계로 전환
-    stepPhase = 'pause';
-    lastStepTime = now;
   }
 
   // ===================================
@@ -287,8 +299,6 @@ const PetEngine = (() => {
    * @param {string} state - StateMachine의 현재 상태 (walking, idle 등)
    */
   function moveForState(state) {
-    const now = Date.now();
-
     switch (movementMode) {
 
       // --- 포물선 점프 ---
@@ -445,7 +455,7 @@ const PetEngine = (() => {
         switch (state) {
           case 'walking':
           case 'ceiling_walk':
-            stepMove(1.0, now);
+            stepMove(1.0);
 
             // 수평 이동 시 경계 처리
             if (edge === 'bottom' || edge === 'top') {
@@ -483,7 +493,7 @@ const PetEngine = (() => {
 
             // 벽에서 위로 기어오름: y 감소
             if (edge === 'left' || edge === 'right') {
-              stepMove(0.7, now);
+              stepMove(0.7);
               // stepMove가 direction(-1)을 적용하므로 y가 감소함
             }
 
@@ -501,7 +511,7 @@ const PetEngine = (() => {
               // direction을 1(아래)로 설정해서 stepMove
               const prevDir = direction;
               direction = 1;
-              stepMove(0.7, now);
+              stepMove(0.7);
               direction = prevDir;
             } else if (edge === 'top') {
               // 천장에서 벽으로 내려가기 시작
@@ -535,7 +545,7 @@ const PetEngine = (() => {
 
           case 'carrying':
             // 짐 들고 느리게 이동
-            stepMove(0.6, now);
+            stepMove(0.6);
             if (edge === 'bottom' || edge === 'top' || edge === 'surface') {
               if (x <= 0) { x = 0; direction = 1; }
               if (x >= screenW - CHAR_SIZE) { x = screenW - CHAR_SIZE; direction = -1; }
@@ -576,6 +586,14 @@ const PetEngine = (() => {
               movementMode = 'falling';
               onSurface = false;
               vy = 0;
+            }
+            break;
+
+          // 커스텀 이동 패턴 실행 중
+          case 'custom':
+            if (activeCustomMovement) {
+              updateCustomMovement(now - (updateCustomMovement._lastTime || now));
+              updateCustomMovement._lastTime = now;
             }
             break;
 
@@ -735,6 +753,7 @@ const PetEngine = (() => {
     if (timestamp - lastAnimTime > ANIM_INTERVAL) {
       animFrame++;
       lastAnimTime = timestamp;
+      animFrameChanged = true;  // 이동 시스템에 프레임 전환 알림
     }
 
     // 이동 모드에 따라 적절한 프레임셋으로 매핑
@@ -845,6 +864,305 @@ const PetEngine = (() => {
   }
 
   // ===================================
+  //  커스텀 이동 패턴 레지스트리
+  // ===================================
+
+  // 등록된 커스텀 이동 패턴 저장소
+  // 각 핸들러: { init(params), update(deltaTime), isComplete(), cleanup() }
+  let customMovements = {};
+  let activeCustomMovement = null;  // 현재 실행 중인 커스텀 이동 { name, handler, state }
+
+  /**
+   * 커스텀 이동 패턴 등록
+   * @param {string} name - 패턴 이름 (예: 'zigzag', 'patrol')
+   * @param {object} handler - { init, update, isComplete, cleanup }
+   */
+  function registerMovement(name, handler) {
+    if (!handler || typeof handler.update !== 'function') {
+      console.error(`[PetEngine] 이동 패턴 '${name}' 등록 실패: update 함수 필수`);
+      return false;
+    }
+    // 기본 메서드 보완
+    handler.init = handler.init || (() => {});
+    handler.isComplete = handler.isComplete || (() => false);
+    handler.cleanup = handler.cleanup || (() => {});
+    customMovements[name] = handler;
+    console.log(`[PetEngine] 커스텀 이동 패턴 등록: ${name}`);
+    return true;
+  }
+
+  /**
+   * 등록된 커스텀 이동 패턴 제거
+   * @param {string} name - 패턴 이름
+   */
+  function unregisterMovement(name) {
+    if (activeCustomMovement && activeCustomMovement.name === name) {
+      stopCustomMovement();
+    }
+    delete customMovements[name];
+  }
+
+  /**
+   * 커스텀 이동 패턴 실행
+   * @param {string} name - 등록된 패턴 이름
+   * @param {object} params - 패턴 초기화 파라미터
+   * @returns {boolean} 실행 성공 여부
+   */
+  function executeCustomMovement(name, params = {}) {
+    const handler = customMovements[name];
+    if (!handler) {
+      console.warn(`[PetEngine] 미등록 이동 패턴: ${name}`);
+      return false;
+    }
+
+    // 기존 커스텀 이동이 있으면 정리
+    if (activeCustomMovement) {
+      activeCustomMovement.handler.cleanup();
+    }
+
+    // 패턴 초기화 시 현재 위치/화면 정보 전달
+    const context = {
+      x, y, screenW, screenH,
+      charSize: CHAR_SIZE,
+      direction, edge, flipX,
+    };
+
+    const state = handler.init(Object.assign({}, params, context)) || {};
+    activeCustomMovement = { name, handler, state };
+
+    // CUSTOM 상태로 전환
+    if (typeof StateMachine !== 'undefined') {
+      StateMachine.forceState('custom');
+    }
+
+    console.log(`[PetEngine] 커스텀 이동 실행: ${name}`);
+    return true;
+  }
+
+  /**
+   * 커스텀 이동 매 프레임 갱신
+   * @param {number} deltaTime - 프레임 간 경과 시간 (ms)
+   */
+  function updateCustomMovement(deltaTime) {
+    if (!activeCustomMovement) return;
+
+    const { handler, state } = activeCustomMovement;
+    const context = {
+      x, y, screenW, screenH,
+      charSize: CHAR_SIZE,
+      direction, edge, flipX,
+      setPos: (nx, ny) => { x = nx; y = ny; },
+      setFlip: (f) => { flipX = f; },
+      setDir: (d) => { direction = d; },
+    };
+
+    handler.update(deltaTime, state, context);
+
+    // 핸들러가 setPos로 위치를 설정했을 수 있음
+    clampPosition();
+
+    // 완료 확인
+    if (handler.isComplete(state)) {
+      stopCustomMovement();
+    }
+  }
+
+  /**
+   * 현재 커스텀 이동 강제 중지 → IDLE 복귀
+   */
+  function stopCustomMovement() {
+    if (!activeCustomMovement) return;
+    activeCustomMovement.handler.cleanup(activeCustomMovement.state);
+    activeCustomMovement = null;
+
+    if (typeof StateMachine !== 'undefined') {
+      StateMachine.forceState('idle');
+    }
+  }
+
+  /**
+   * 등록된 커스텀 이동 패턴 목록 반환
+   */
+  function getRegisteredMovements() {
+    return Object.keys(customMovements);
+  }
+
+  // --- 사전 등록 이동 패턴 ---
+
+  // 지그재그: 대각선 방향 교대로 이동
+  registerMovement('zigzag', {
+    init(params) {
+      return {
+        amplitude: params.amplitude || 40,     // 좌우 진폭 (px)
+        speed: params.speed || 2,              // 전진 속도
+        segmentLength: params.segmentLength || 60, // 한 구간 길이
+        traveled: 0,
+        totalDistance: params.distance || 300,  // 총 이동 거리
+        zigDir: 1,                             // 지그재그 방향
+        startX: params.x,
+        startY: params.y,
+      };
+    },
+    update(dt, state, ctx) {
+      const step = state.speed * (dt / 16);
+      state.traveled += step;
+
+      // 수평 전진
+      const moveX = step * (ctx.direction || 1);
+      // 수직 지그재그
+      const segProgress = (state.traveled % state.segmentLength) / state.segmentLength;
+      if (segProgress < 0.05) state.zigDir *= -1;
+      const moveY = state.zigDir * step * 0.7;
+
+      ctx.setPos(ctx.x + moveX, ctx.y + moveY);
+      ctx.setFlip(moveX < 0);
+    },
+    isComplete(state) {
+      return state.traveled >= state.totalDistance;
+    },
+    cleanup() {},
+  });
+
+  // 순찰: 두 지점 사이를 왕복
+  registerMovement('patrol', {
+    init(params) {
+      return {
+        pointA: { x: params.pointAX || 100, y: params.pointAY || params.y },
+        pointB: { x: params.pointBX || params.screenW - 164, y: params.pointBY || params.y },
+        speed: params.speed || 1.5,
+        laps: params.laps || 3,                // 왕복 횟수
+        currentLap: 0,
+        targetIdx: 0,                          // 0=A, 1=B
+      };
+    },
+    update(dt, state, ctx) {
+      const target = state.targetIdx === 0 ? state.pointA : state.pointB;
+      const dx = target.x - ctx.x;
+      const dy = target.y - ctx.y;
+      const dist = Math.hypot(dx, dy);
+
+      if (dist < 5) {
+        // 목표 도달 → 방향 전환
+        state.targetIdx = 1 - state.targetIdx;
+        if (state.targetIdx === 0) state.currentLap++;
+        return;
+      }
+
+      const step = state.speed * (dt / 16);
+      const ratio = step / dist;
+      ctx.setPos(ctx.x + dx * ratio, ctx.y + dy * ratio);
+      ctx.setFlip(dx < 0);
+    },
+    isComplete(state) {
+      return state.currentLap >= state.laps;
+    },
+    cleanup() {},
+  });
+
+  // 원형 회전: 중심점 기준 회전
+  registerMovement('circle', {
+    init(params) {
+      return {
+        centerX: params.centerX || params.x,
+        centerY: params.centerY || params.y - 50,
+        radius: params.radius || 50,
+        speed: params.speed || 0.03,           // 각속도 (rad/frame)
+        angle: 0,
+        totalAngle: params.revolutions ? params.revolutions * Math.PI * 2 : Math.PI * 4,
+        traveled: 0,
+      };
+    },
+    update(dt, state, ctx) {
+      const step = state.speed * (dt / 16);
+      state.angle += step;
+      state.traveled += Math.abs(step);
+
+      const nx = state.centerX + Math.cos(state.angle) * state.radius;
+      const ny = state.centerY + Math.sin(state.angle) * state.radius;
+      ctx.setPos(nx, ny);
+      ctx.setFlip(Math.sin(state.angle) < 0);
+    },
+    isComplete(state) {
+      return state.traveled >= state.totalAngle;
+    },
+    cleanup() {},
+  });
+
+  // 떨기: 빠르게 좌우 진동
+  registerMovement('shake', {
+    init(params) {
+      return {
+        intensity: params.intensity || 4,      // 떨림 강도 (px)
+        duration: params.duration || 800,       // 지속 시간 (ms)
+        elapsed: 0,
+        originX: params.x,
+        originY: params.y,
+        phase: 0,
+      };
+    },
+    update(dt, state, ctx) {
+      state.elapsed += dt;
+      state.phase += dt * 0.05;
+
+      // 감쇠하는 사인파 진동
+      const decay = 1 - (state.elapsed / state.duration);
+      const offsetX = Math.sin(state.phase) * state.intensity * decay;
+      ctx.setPos(state.originX + offsetX, state.originY);
+    },
+    isComplete(state) {
+      return state.elapsed >= state.duration;
+    },
+    cleanup() {},
+  });
+
+  // 댄스: 여러 동작을 연속 수행 (점프 + 회전 + 떨기 조합)
+  registerMovement('dance', {
+    init(params) {
+      return {
+        duration: params.duration || 3000,
+        elapsed: 0,
+        originX: params.x,
+        originY: params.y,
+        phase: 0,
+      };
+    },
+    update(dt, state, ctx) {
+      state.elapsed += dt;
+      state.phase += dt * 0.004;
+
+      const t = state.elapsed / state.duration;
+
+      // 구간별 다른 동작
+      if (t < 0.25) {
+        // 구간 1: 좌우 스윙
+        const swingX = Math.sin(state.phase * 8) * 20;
+        ctx.setPos(state.originX + swingX, state.originY);
+        ctx.setFlip(swingX < 0);
+      } else if (t < 0.5) {
+        // 구간 2: 상하 바운스
+        const bounceY = Math.abs(Math.sin(state.phase * 6)) * -30;
+        ctx.setPos(state.originX, state.originY + bounceY);
+      } else if (t < 0.75) {
+        // 구간 3: 작은 원
+        const angle = state.phase * 10;
+        ctx.setPos(
+          state.originX + Math.cos(angle) * 15,
+          state.originY + Math.sin(angle) * 15
+        );
+        ctx.setFlip(Math.cos(angle) < 0);
+      } else {
+        // 구간 4: 빠른 좌우 떨기 (피니시)
+        const shake = Math.sin(state.phase * 20) * 6 * (1 - t);
+        ctx.setPos(state.originX + shake, state.originY);
+      }
+    },
+    isComplete(state) {
+      return state.elapsed >= state.duration;
+    },
+    cleanup() {},
+  });
+
+  // ===================================
   //  메인 루프
   // ===================================
 
@@ -853,17 +1171,37 @@ const PetEngine = (() => {
   /**
    * 엔진 시작: requestAnimationFrame 루프 가동
    */
+  let lastLoopTimestamp = 0;  // 이전 루프 타임스탬프 (deltaTime 계산용)
+
   function start() {
     if (running) return;
     running = true;
     lastAnimTime = performance.now();
-    lastStepTime = Date.now();
+    lastLoopTimestamp = performance.now();
 
     function loop(timestamp) {
       if (!running) return;
+
+      // 커스텀 이동용 deltaTime 계산
+      const deltaTime = timestamp - lastLoopTimestamp;
+      lastLoopTimestamp = timestamp;
+
       const state = StateMachine.update();
-      moveForState(state);
+
+      // 애니메이션을 먼저 갱신 → animFrameChanged 플래그 설정
       updateAnimation(state, timestamp);
+
+      // 커스텀 이동이 활성 상태이면 전용 업데이트 실행
+      if (activeCustomMovement && state === 'custom') {
+        updateCustomMovement(deltaTime);
+        clampPosition();
+        updateVisual();
+      } else {
+        moveForState(state);
+      }
+
+      // 프레임 전환 플래그 리셋 (다음 프레임까지 대기)
+      animFrameChanged = false;
       frameId = requestAnimationFrame(loop);
     }
     frameId = requestAnimationFrame(loop);
@@ -883,9 +1221,13 @@ const PetEngine = (() => {
     getPosition, setPosition, setEdge, setDirection,
     snapToNearestEdge, setSpeedMultiplier,
     moveForState, updateAnimation,
-    // 새 API: 물리 기반 이동
+    // 물리 기반 이동
     jumpTo, startRappel, releaseThread, moveToCenter,
     setSurfaces, getThread, startFalling,
+    // 커스텀 이동 패턴 시스템
+    registerMovement, unregisterMovement,
+    executeCustomMovement, stopCustomMovement,
+    getRegisteredMovements,
     CHAR_SIZE,
   };
 })();

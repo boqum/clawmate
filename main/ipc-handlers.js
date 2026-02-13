@@ -1,5 +1,7 @@
 const { ipcMain, screen, desktopCapturer } = require('electron');
 const { getDesktopFiles, moveFile, undoFileMove, undoAllMoves, getFileManifest } = require('./file-ops');
+const { executeSmartFileOp, undoSmartMove, undoAllSmartMoves, listFilteredFiles } = require('./smart-file-ops');
+const { parseMessage } = require('./file-command-parser');
 const Store = require('./store');
 
 const store = new Store('clawmate-config', {
@@ -119,6 +121,14 @@ function registerIpcHandlers(getMainWindow, getAIBridge) {
         case 'user_idle':
           bridge.reportIdleTime(data.idleSeconds);
           break;
+        case 'browsing':
+          // 브라우징 컨텍스트 (제목 + 커서 위치 + 화면 캡처) → AI 코멘트 생성
+          bridge.send('user_event', { event: 'browsing', ...data });
+          break;
+        default:
+          // 알 수 없는 이벤트도 AI에 전달 (확장성)
+          bridge.send('user_event', { event, ...data });
+          break;
       }
     }
   });
@@ -129,10 +139,102 @@ function registerIpcHandlers(getMainWindow, getAIBridge) {
     return bridge ? bridge.isConnected() : false;
   });
 
+  // 메트릭 보고 (렌더러 → main → OpenClaw)
+  ipcMain.on('report-metrics', (_, summary) => {
+    const bridge = getAIBridge();
+    if (bridge && bridge.isConnected()) {
+      bridge.reportMetrics(summary);
+    }
+  });
+
   // 열린 윈도우 위치/크기 조회
   ipcMain.handle('get-window-positions', async () => {
     const { getWindowPositions } = require('./platform');
     return await getWindowPositions();
+  });
+
+  // 활성 윈도우 제목 조회 (브라우저 감시용)
+  ipcMain.handle('get-active-window-title', async () => {
+    const { getActiveWindowTitle } = require('./platform');
+    return await getActiveWindowTitle();
+  });
+
+  // 커서 위치 조회 (화면 좌표)
+  ipcMain.handle('get-cursor-position', () => {
+    const point = screen.getCursorScreenPoint();
+    return { x: point.x, y: point.y };
+  });
+
+  // === 스마트 파일 조작 IPC ===
+
+  // 파일 명령 파싱 (렌더러에서도 사용 가능)
+  ipcMain.handle('parse-file-command', (_, text) => {
+    return parseMessage(text);
+  });
+
+  // 필터된 파일 목록 조회
+  ipcMain.handle('list-filtered-files', async (_, sourceDir, filter) => {
+    return listFilteredFiles(sourceDir, filter);
+  });
+
+  // 스마트 파일 조작 실행
+  // 렌더러에서 직접 실행할 때 사용 (텔레그램 경유가 아닌 경우)
+  ipcMain.handle('smart-file-op', async (_, command) => {
+    const win = getMainWindow();
+    const callbacks = {
+      onStart: (totalFiles) => {
+        if (win && !win.isDestroyed()) {
+          win.webContents.send('ai-command', {
+            type: 'smart_file_op',
+            payload: { phase: 'start', totalFiles },
+          });
+        }
+      },
+      onPickUp: (fileName, index) => {
+        if (win && !win.isDestroyed()) {
+          win.webContents.send('ai-command', {
+            type: 'smart_file_op',
+            payload: { phase: 'pick_up', fileName, index },
+          });
+        }
+      },
+      onDrop: (fileName, targetName, index) => {
+        if (win && !win.isDestroyed()) {
+          win.webContents.send('ai-command', {
+            type: 'smart_file_op',
+            payload: { phase: 'drop', fileName, targetName, index },
+          });
+        }
+      },
+      onComplete: (result) => {
+        if (win && !win.isDestroyed()) {
+          win.webContents.send('ai-command', {
+            type: 'smart_file_op',
+            payload: { phase: 'complete', ...result },
+          });
+        }
+      },
+      onError: (error) => {
+        if (win && !win.isDestroyed()) {
+          win.webContents.send('ai-command', {
+            type: 'smart_file_op',
+            payload: { phase: 'error', error },
+          });
+        }
+      },
+    };
+
+    return await executeSmartFileOp(command, callbacks);
+  });
+
+  // 스마트 이동 되돌리기 (단일)
+  ipcMain.handle('undo-smart-move', async (_, moveId) => {
+    return undoSmartMove(moveId);
+  });
+
+  // 스마트 이동 전체 되돌리기
+  ipcMain.handle('undo-all-smart-moves', async () => {
+    return undoAllSmartMoves();
   });
 }
 

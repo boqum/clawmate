@@ -30,6 +30,16 @@ let lastDesktopCheckTime = 0;
 let lastScreenCheckTime = 0;
 let lastGreetingDate = null;  // 하루에 한번만 인사
 
+// 브라우징 감시 시스템 상태
+let browsingContext = {
+  title: '',                   // 현재 윈도우 제목
+  category: '',                // 카테고리 (shopping, video, dev 등)
+  lastCommentTime: 0,          // 마지막 AI 코멘트 시각
+  screenImage: null,           // 최근 화면 캡처 (base64)
+  cursorX: 0,                  // 커서 X 좌표
+  cursorY: 0,                  // 커서 Y 좌표
+};
+
 // 공간 탐험 시스템 상태
 let knownWindows = [];         // 알고 있는 윈도우 목록
 let lastWindowCheckTime = 0;
@@ -38,10 +48,23 @@ let explorationHistory = [];   // 탐험한 위치 기록
 let lastExploreTime = 0;
 let lastFolderCarryTime = 0;
 
+// =====================================================
+// 자기 관찰 시스템 상태 (Metrics)
+// =====================================================
+let latestMetrics = null;          // 가장 최근 수신한 메트릭 데이터
+let metricsHistory = [];           // 최근 10개 메트릭 보고 이력
+let behaviorAdjustments = {        // 현재 적용 중인 행동 조정값
+  speechCooldownMultiplier: 1.0,   // 말풍선 빈도 조절 (1.0=기본, >1=줄임, <1=늘림)
+  actionCooldownMultiplier: 1.0,   // 행동 빈도 조절
+  explorationBias: 0,              // 탐험 편향 (양수=더 탐험, 음수=덜 탐험)
+  activityLevel: 1.0,              // 활동 수준 (0.5=차분, 1.0=보통, 1.5=활발)
+};
+let lastMetricsLogTime = 0;        // 마지막 품질 보고서 로그 시각
+
 module.exports = {
   id: 'clawmate',
   name: 'ClawMate',
-  version: '1.2.0',
+  version: '1.3.0',
   description: 'OpenClaw 데스크톱 펫 - AI가 조종하는 살아있는 Claw',
 
   /**
@@ -114,6 +137,34 @@ module.exports = {
       execute: async (context) => {
         if (!connector || !connector.connected) return;
         connector.decide(context.params);
+      },
+    });
+
+    // 스마트 파일 정리 (텔레그램에서 트리거 가능)
+    api.registerSkill('pet-file-organize', {
+      triggers: [
+        '바탕화면 정리', '파일 정리', '파일 옮겨',
+        'organize desktop', 'clean desktop', 'move files',
+      ],
+      description: '펫이 바탕화면 파일을 정리합니다',
+      execute: async (context) => {
+        if (!connector || !connector.connected) {
+          return { message: 'ClawMate 연결 중이 아닙니다.' };
+        }
+        const text = context.params?.text || context.input;
+        const { parseMessage } = require('./main/file-command-parser');
+        const parsed = parseMessage(text);
+
+        if (parsed.type === 'smart_file_op') {
+          // smart_file_op 명령을 커넥터를 통해 Electron 측에 전달
+          connector._send('smart_file_op', {
+            command: parsed,
+            fromPlugin: true,
+          });
+          return { message: `파일 정리 시작: ${text}` };
+        }
+
+        return { message: '파일 정리 명령을 이해하지 못했습니다.' };
       },
     });
   },
@@ -229,6 +280,11 @@ function setupConnectorEvents() {
 
   connector.onUserEvent(async (event) => {
     await handleUserEvent(event);
+  });
+
+  // 메트릭 리포트 수신 → 자기 관찰 시스템에서 분석
+  connector.onMetrics((data) => {
+    handleMetrics(data);
   });
 
   // 윈도우 위치 정보 수신 → 탐험 시스템에서 활용
@@ -375,11 +431,509 @@ async function handleUserEvent(event) {
         });
       }
       break;
+
+    case 'browsing':
+      handleBrowsingComment(event);
+      break;
+
+    case 'character_request':
+      handleCharacterRequest(event);
+      break;
   }
 }
 
 function sleep(ms) {
   return new Promise(r => setTimeout(r, ms));
+}
+
+// =====================================================
+// 브라우징 AI 코멘트 시스템
+// 윈도우 제목 + 화면 캡처 + 커서 위치 기반 맥락 코멘트
+// =====================================================
+
+/**
+ * 브라우징 컨텍스트 수신 → AI 코멘트 생성
+ *
+ * 렌더러(BrowserWatcher)가 감지한 브라우징 활동을 받아서
+ * 화면 캡처와 제목을 분석하여 맥락에 맞는 코멘트를 생성한다.
+ *
+ * @param {object} event - { title, category, cursorX, cursorY, screen?, titleChanged }
+ */
+async function handleBrowsingComment(event) {
+  if (!connector || !connector.connected) return;
+
+  const now = Date.now();
+  // AI 코멘트 쿨다운 (45초)
+  if (now - browsingContext.lastCommentTime < 45000) return;
+
+  browsingContext.title = event.title || '';
+  browsingContext.category = event.category || '';
+  browsingContext.cursorX = event.cursorX || 0;
+  browsingContext.cursorY = event.cursorY || 0;
+
+  // 화면 캡처 데이터 저장 (있으면)
+  if (event.screen?.image) {
+    browsingContext.screenImage = event.screen.image;
+  }
+
+  let comment = null;
+
+  // 1차: apiRef.generate()로 AI 텍스트 생성 시도
+  if (apiRef?.generate) {
+    try {
+      const prompt = buildBrowsingPrompt(event);
+      comment = await apiRef.generate(prompt);
+      // 너무 긴 응답은 자르기
+      if (comment && comment.length > 50) {
+        comment = comment.slice(0, 50);
+      }
+    } catch {}
+  }
+
+  // 2차: apiRef.chat()으로 시도
+  if (!comment && apiRef?.chat) {
+    try {
+      const prompt = buildBrowsingPrompt(event);
+      const response = await apiRef.chat([
+        { role: 'system', content: '넌 데스크톱 위의 작은 펫이야. 짧고 재치있게 한마디 해. 20자 이내. 한국어.' },
+        { role: 'user', content: prompt },
+      ]);
+      comment = response?.text || response?.content || response;
+      if (comment && typeof comment === 'string' && comment.length > 50) {
+        comment = comment.slice(0, 50);
+      }
+    } catch {}
+  }
+
+  // 3차: 이미지 분석으로 시도 (화면 캡처가 있을 때)
+  if (!comment && apiRef?.analyzeImage && browsingContext.screenImage) {
+    try {
+      comment = await apiRef.analyzeImage(browsingContext.screenImage, {
+        prompt: `사용자가 "${browsingContext.title}"을 보고 있어. 커서 위치: (${browsingContext.cursorX}, ${browsingContext.cursorY}). 데스크톱 펫으로서 화면 내용에 대해 재치있게 한마디 해줘. 20자 이내. 한국어.`,
+      });
+    } catch {}
+  }
+
+  // 4차: 스마트 폴백 — 타이틀 분석 기반 코멘트
+  if (!comment || typeof comment !== 'string') {
+    comment = generateSmartBrowsingComment(browsingContext);
+  }
+
+  if (comment) {
+    connector.decide({
+      action: Math.random() < 0.3 ? 'excited' : 'idle',
+      speech: comment,
+      emotion: 'curious',
+    });
+    browsingContext.lastCommentTime = now;
+    lastSpeechTime = now;
+    console.log(`[ClawMate] 브라우징 코멘트: ${comment}`);
+
+    // 1.5초 후 원래 상태로
+    setTimeout(() => {
+      if (connector?.connected) connector.action('idle');
+    }, 1500);
+  }
+
+  // 캡처 데이터 정리 (메모리 절약)
+  browsingContext.screenImage = null;
+}
+
+/**
+ * AI 코멘트 생성용 프롬프트 구성
+ */
+function buildBrowsingPrompt(event) {
+  const title = event.title || '';
+  const category = event.category || 'unknown';
+  const cursor = event.cursorX && event.cursorY
+    ? `커서 위치: (${event.cursorX}, ${event.cursorY}).`
+    : '';
+
+  return `사용자가 지금 "${title}" 화면을 보고 있어. ` +
+    `카테고리: ${category}. ${cursor} ` +
+    `이 상황에 대해 짧고 재치있게 한마디 해줘. 20자 이내. 한국어로. ` +
+    `너는 데스크톱 위의 작은 귀여운 펫이야. 친근하고 장난스러운 톤으로.`;
+}
+
+/**
+ * 타이틀 분석 기반 스마트 코멘트 생성
+ *
+ * AI API가 없어도 윈도우 제목에서 실제 맥락을 추출하여
+ * 프리셋보다 훨씬 자연스러운 코멘트를 생성한다.
+ *
+ * 예: "React hooks tutorial - YouTube" → "리액트 훅 공부하고 있구나!"
+ *     "Pull Request #42 - GitHub" → "PR 리뷰 중? 꼼꼼히 봐!"
+ */
+function generateSmartBrowsingComment(ctx) {
+  const title = ctx.title || '';
+  const category = ctx.category || '';
+  const titleLower = title.toLowerCase();
+
+  // 타이틀에서 사이트명과 페이지 제목 분리
+  // 일반적 패턴: "페이지 제목 - 사이트명" or "사이트명: 페이지 제목"
+  const parts = title.split(/\s[-–|:]\s/);
+  const pageName = (parts[0] || title).trim();
+  const pageShort = pageName.slice(0, 20);
+
+  // 카테고리별 맥락 인식 코멘트 생성기
+  const generators = {
+    shopping: () => {
+      const templates = [
+        `${pageShort} 보고 있구나? 좋은 거 찾으면 알려줘!`,
+        `쇼핑 중이네! ${pageShort}... 살 거야?`,
+        `${pageShort} 괜찮아 보이는데? 장바구니 담을 거야?`,
+      ];
+      return pick(templates);
+    },
+    video: () => {
+      if (titleLower.includes('youtube') || titleLower.includes('유튜브')) {
+        return `"${pageShort}" 재미있어? 나도 궁금!`;
+      }
+      if (titleLower.includes('netflix') || titleLower.includes('넷플릭스') ||
+          titleLower.includes('tving') || titleLower.includes('watcha')) {
+        return `뭐 보는 거야? "${pageShort}" 재밌어?`;
+      }
+      return `영상 보고 있구나! "${pageShort}" 추천할 만해?`;
+    },
+    sns: () => {
+      if (titleLower.includes('twitter') || titleLower.includes('x.com')) {
+        return '트윗 보고 있구나~ 재미있는 거 있어?';
+      }
+      if (titleLower.includes('instagram') || titleLower.includes('인스타')) {
+        return '인스타 구경 중? 좋은 사진 보여줘!';
+      }
+      if (titleLower.includes('reddit')) {
+        return '레딧 탐색 중! 어떤 서브레딧이야?';
+      }
+      return 'SNS 하고 있구나~ 무한 스크롤 조심!';
+    },
+    news: () => {
+      return `"${pageShort}" — 무슨 뉴스야? 좋은 소식이길!`;
+    },
+    dev: () => {
+      if (titleLower.includes('pull request') || titleLower.includes('pr #')) {
+        return 'PR 리뷰 중이구나! 꼼꼼히 봐~';
+      }
+      if (titleLower.includes('issue')) {
+        return '이슈 처리 중? 화이팅!';
+      }
+      if (titleLower.includes('stackoverflow') || titleLower.includes('stack overflow')) {
+        return '스택오버플로우! 뭐가 막혔어? 도와줄까?';
+      }
+      if (titleLower.includes('github')) {
+        return `GitHub에서 "${pageShort}" 작업 중?`;
+      }
+      if (titleLower.includes('docs') || titleLower.includes('documentation')) {
+        return '문서 읽고 있구나! 공부 열심히~';
+      }
+      return `코딩 관련! "${pageShort}" 화이팅!`;
+    },
+    search: () => {
+      // "검색어 - Google 검색" 패턴에서 검색어 추출
+      const searchMatch = title.match(/(.+?)\s*[-–]\s*(Google|Bing|네이버|Naver|검색)/i);
+      if (searchMatch) {
+        const query = searchMatch[1].trim().slice(0, 15);
+        const templates = [
+          `"${query}" 궁금해? 내가 알려줄 수도 있는데!`,
+          `"${query}" 검색하고 있구나~ 찾으면 알려줘!`,
+          `오, "${query}" 나도 궁금하다!`,
+        ];
+        return pick(templates);
+      }
+      return '뭐 찾고 있어? 궁금한 거 있으면 물어봐!';
+    },
+    game: () => {
+      return `${pageShort} 하고 있어? 이기고 있어?!`;
+    },
+    music: () => {
+      return `뭐 듣고 있어? "${pageShort}" 좋은 노래야?`;
+    },
+    mail: () => {
+      return '메일 확인 중~ 중요한 거 있어?';
+    },
+    general: () => {
+      const templates = [
+        `"${pageShort}" 보고 있구나~`,
+        `오, ${pageShort}! 뭐 하는 거야?`,
+      ];
+      return pick(templates);
+    },
+  };
+
+  const gen = generators[category];
+  if (gen) return gen();
+
+  // 카테고리 미매칭: 제목 기반 일반 코멘트
+  if (pageName.length > 3) {
+    const templates = [
+      `"${pageShort}" 보고 있구나!`,
+      `오, ${pageShort}! 재미있어?`,
+      `${pageShort}... 뭐 하는 거야?`,
+    ];
+    return pick(templates);
+  }
+
+  return null;
+}
+
+/** 배열에서 랜덤 선택 */
+function pick(arr) {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+// =====================================================
+// AI 캐릭터 생성 시스템
+// 텔레그램 컨셉 설명 → AI가 16x16 픽셀 아트 생성
+// =====================================================
+
+/**
+ * 캐릭터 생성 요청 처리 (텔레그램에서 트리거)
+ *
+ * 1차: apiRef로 AI 캐릭터 생성 (색상 + 프레임 데이터)
+ * 2차: 키워드 기반 색상 변환 (AI 없을 때 폴백)
+ *
+ * @param {object} event - { concept, chatId }
+ */
+async function handleCharacterRequest(event) {
+  if (!connector || !connector.connected) return;
+
+  const concept = event.concept || '';
+  if (!concept) return;
+
+  console.log(`[ClawMate] 캐릭터 생성 요청: "${concept}"`);
+
+  let characterData = null;
+
+  // 1차: AI로 색상 팔레트 + 프레임 데이터 생성
+  if (apiRef?.generate) {
+    try {
+      characterData = await generateCharacterWithAI(concept);
+    } catch (err) {
+      console.log(`[ClawMate] AI 캐릭터 생성 실패: ${err.message}`);
+    }
+  }
+
+  // 2차: AI chat으로 시도
+  if (!characterData && apiRef?.chat) {
+    try {
+      characterData = await generateCharacterWithChat(concept);
+    } catch (err) {
+      console.log(`[ClawMate] AI chat 캐릭터 생성 실패: ${err.message}`);
+    }
+  }
+
+  // 3차: 키워드 기반 색상만 변환 (폴백)
+  if (!characterData) {
+    characterData = generateCharacterFromKeywords(concept);
+  }
+
+  if (characterData) {
+    // 캐릭터 데이터를 렌더러에 전송
+    connector._send('set_character', {
+      ...characterData,
+      speech: `${concept} 변신 완료!`,
+    });
+    console.log(`[ClawMate] 캐릭터 생성 완료: "${concept}"`);
+  }
+}
+
+/**
+ * AI generate()로 캐릭터 생성
+ */
+async function generateCharacterWithAI(concept) {
+  const prompt = buildCharacterPrompt(concept);
+  const response = await apiRef.generate(prompt);
+  return parseCharacterResponse(response);
+}
+
+/**
+ * AI chat()으로 캐릭터 생성
+ */
+async function generateCharacterWithChat(concept) {
+  const prompt = buildCharacterPrompt(concept);
+  const response = await apiRef.chat([
+    { role: 'system', content: '넌 16x16 픽셀 아트 캐릭터 디자이너야. JSON으로 캐릭터 데이터를 출력해.' },
+    { role: 'user', content: prompt },
+  ]);
+  const text = response?.text || response?.content || response;
+  return parseCharacterResponse(text);
+}
+
+/**
+ * 캐릭터 생성 프롬프트
+ */
+function buildCharacterPrompt(concept) {
+  return `"${concept}" 컨셉의 16x16 픽셀 아트 캐릭터를 만들어줘.
+
+JSON 형식으로 출력해:
+{
+  "colorMap": {
+    "primary": "#hex색상",   // 메인 몸통 색
+    "secondary": "#hex색상", // 보조 색 (배, 볼 등)
+    "dark": "#hex색상",      // 어두운 부분 (다리, 그림자)
+    "eye": "#hex색상",       // 눈 흰자
+    "pupil": "#hex색상",     // 눈동자
+    "claw": "#hex색상"       // 집게/손/특징 부위
+  },
+  "frames": {
+    "idle": [
+      [16x16 숫자 배열 - frame 0],
+      [16x16 숫자 배열 - frame 1]
+    ]
+  }
+}
+
+숫자 의미: 0=투명, 1=primary, 2=secondary, 3=dark, 4=eye, 5=pupil, 6=claw
+캐릭터는 눈(4+5), 몸통(1+2), 다리(3), 특징(6)을 포함해야 해.
+idle 프레임 2개만 만들어줘. 귀엽게!
+JSON만 출력해.`;
+}
+
+/**
+ * AI 응답에서 캐릭터 데이터 파싱
+ */
+function parseCharacterResponse(response) {
+  if (!response || typeof response !== 'string') return null;
+
+  // JSON 블록 추출 (```json ... ``` 또는 { ... })
+  let jsonStr = response;
+  const jsonMatch = response.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (jsonMatch) {
+    jsonStr = jsonMatch[1].trim();
+  } else {
+    const braceMatch = response.match(/\{[\s\S]*\}/);
+    if (braceMatch) {
+      jsonStr = braceMatch[0];
+    }
+  }
+
+  try {
+    const data = JSON.parse(jsonStr);
+
+    // colorMap 검증
+    if (data.colorMap) {
+      const required = ['primary', 'secondary', 'dark', 'eye', 'pupil', 'claw'];
+      for (const key of required) {
+        if (!data.colorMap[key]) return null;
+      }
+    } else {
+      return null;
+    }
+
+    // frames 검증 (있으면)
+    if (data.frames?.idle) {
+      for (const frame of data.frames.idle) {
+        if (!Array.isArray(frame) || frame.length !== 16) {
+          delete data.frames; // 프레임 데이터 불량 → 색상만 사용
+          break;
+        }
+        for (const row of frame) {
+          if (!Array.isArray(row) || row.length !== 16) {
+            delete data.frames;
+            break;
+          }
+        }
+        if (!data.frames) break;
+      }
+    }
+
+    return data;
+  } catch {
+    // JSON 파싱 실패 → 색상만 추출 시도
+    const colorMatch = response.match(/"primary"\s*:\s*"(#[0-9a-fA-F]{6})"/);
+    if (colorMatch) {
+      // 최소한 primary 색상이라도 추출
+      return generateCharacterFromKeywords(response);
+    }
+    return null;
+  }
+}
+
+/**
+ * 키워드 기반 캐릭터 색상 생성 (AI 없을 때 폴백)
+ *
+ * 컨셉에서 색상/생물 키워드를 추출하여 팔레트 생성
+ */
+function generateCharacterFromKeywords(concept) {
+  const c = (concept || '').toLowerCase();
+
+  // 색상 키워드 매핑
+  const colorMap = {
+    '파란|파랑|blue': { primary: '#4488ff', secondary: '#6699ff', dark: '#223388', claw: '#4488ff' },
+    '초록|녹색|green': { primary: '#44cc44', secondary: '#66dd66', dark: '#226622', claw: '#44cc44' },
+    '보라|purple': { primary: '#8844cc', secondary: '#aa66dd', dark: '#442266', claw: '#8844cc' },
+    '노란|금색|yellow|gold': { primary: '#ffcc00', secondary: '#ffdd44', dark: '#886600', claw: '#ffcc00' },
+    '분홍|핑크|pink': { primary: '#ff69b4', secondary: '#ff8cc4', dark: '#8B3060', claw: '#ff69b4' },
+    '하얀|흰|white': { primary: '#eeeeee', secondary: '#ffffff', dark: '#999999', claw: '#dddddd' },
+    '검정|까만|black': { primary: '#333333', secondary: '#555555', dark: '#111111', claw: '#444444' },
+    '주황|orange': { primary: '#ff8800', secondary: '#ffaa33', dark: '#884400', claw: '#ff8800' },
+    '민트|틸|teal': { primary: '#00BFA5', secondary: '#33D4BC', dark: '#006655', claw: '#00BFA5' },
+  };
+
+  // 생물 키워드 매핑
+  const creatureMap = {
+    '고양이|cat': { primary: '#ff9944', secondary: '#ffbb66', dark: '#663300', claw: '#ff9944' },
+    '로봇|robot': { primary: '#888888', secondary: '#aaaaaa', dark: '#444444', claw: '#66aaff' },
+    '슬라임|slime': { primary: '#44dd44', secondary: '#88ff88', dark: '#228822', claw: '#44dd44' },
+    '유령|ghost': { primary: '#ccccff', secondary: '#eeeeff', dark: '#6666aa', claw: '#ccccff' },
+    '드래곤|dragon': { primary: '#cc2222', secondary: '#ff4444', dark: '#661111', claw: '#ffaa00' },
+    '펭귄|penguin': { primary: '#222222', secondary: '#ffffff', dark: '#111111', claw: '#ff8800' },
+    '토끼|rabbit': { primary: '#ffcccc', secondary: '#ffeeee', dark: '#ff8888', claw: '#ffcccc' },
+    '악마|demon': { primary: '#660066', secondary: '#880088', dark: '#330033', claw: '#ff0000' },
+    '천사|angel': { primary: '#ffffff', secondary: '#ffffcc', dark: '#ddddaa', claw: '#ffdd00' },
+    '강아지|dog': { primary: '#cc8844', secondary: '#ddaa66', dark: '#664422', claw: '#cc8844' },
+    '불|fire': { primary: '#ff4400', secondary: '#ffaa00', dark: '#881100', claw: '#ff6600' },
+    '얼음|ice': { primary: '#88ccff', secondary: '#bbddff', dark: '#446688', claw: '#aaddff' },
+  };
+
+  // 색상 키워드 먼저 체크
+  for (const [keywords, palette] of Object.entries(colorMap)) {
+    for (const kw of keywords.split('|')) {
+      if (c.includes(kw)) {
+        return {
+          colorMap: { ...palette, eye: '#ffffff', pupil: '#111111' },
+        };
+      }
+    }
+  }
+
+  // 생물 키워드 체크
+  for (const [keywords, palette] of Object.entries(creatureMap)) {
+    for (const kw of keywords.split('|')) {
+      if (c.includes(kw)) {
+        return {
+          colorMap: { ...palette, eye: '#ffffff', pupil: '#111111' },
+        };
+      }
+    }
+  }
+
+  // 매칭 실패 → 랜덤 색상
+  const hue = Math.floor(Math.random() * 360);
+  const s = 70, l = 55;
+  return {
+    colorMap: {
+      primary: hslToHex(hue, s, l),
+      secondary: hslToHex(hue, s, l + 15),
+      dark: hslToHex(hue, s - 10, l - 30),
+      eye: '#ffffff',
+      pupil: '#111111',
+      claw: hslToHex(hue, s, l),
+    },
+  };
+}
+
+/** HSL → HEX 변환 */
+function hslToHex(h, s, l) {
+  s /= 100;
+  l /= 100;
+  const a = s * Math.min(l, 1 - l);
+  const f = (n) => {
+    const k = (n + h / 30) % 12;
+    const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+    return Math.round(255 * color).toString(16).padStart(2, '0');
+  };
+  return `#${f(0)}${f(8)}${f(4)}`;
 }
 
 // =====================================================
@@ -574,7 +1128,7 @@ function handleTimeGreeting(now, hour, todayStr) {
  * 최소 30초 쿨타임, 야간에는 확률 대폭 감소
  */
 function handleIdleSpeech(now, isNightMode) {
-  const speechCooldown = 30000; // 30초
+  const speechCooldown = 30000 * behaviorAdjustments.speechCooldownMultiplier; // 기본 30초, 메트릭에 의해 조절
   if (now - lastSpeechTime < speechCooldown) return;
 
   // 야간: 5% 확률 / 주간: 25% 확률
@@ -592,7 +1146,7 @@ function handleIdleSpeech(now, isNightMode) {
  * 최소 5초 쿨타임, 가중치 기반 랜덤 선택
  */
 function handleRandomAction(now, hour, isNightMode, state) {
-  const actionCooldown = 5000; // 5초
+  const actionCooldown = 5000 * behaviorAdjustments.actionCooldownMultiplier; // 기본 5초, 메트릭에 의해 조절
   if (now - lastActionTime < actionCooldown) return;
 
   // 야간: 10% 확률 / 주간: 40% 확률
@@ -743,8 +1297,9 @@ function handleExploration(now, state) {
   const exploreInterval = 20000; // 20초
   if (now - lastExploreTime < exploreInterval) return;
 
-  // 20% 확률
-  if (Math.random() > 0.2) return;
+  // 기본 20% 확률 + explorationBias 보정 (bias가 양수면 탐험 확률 증가)
+  const exploreChance = Math.max(0.05, Math.min(0.8, 0.2 + behaviorAdjustments.explorationBias));
+  if (Math.random() > exploreChance) return;
   lastExploreTime = now;
 
   // 가중치 기반 탐험 행동 선택
@@ -853,6 +1408,195 @@ function handleFolderCarry(now) {
   } catch {
     // 바탕화면 폴더 접근 실패 — 무시
   }
+}
+
+// =====================================================
+// 자기 관찰 시스템 (Metrics → 행동 조정)
+// =====================================================
+
+/**
+ * 메트릭 데이터 수신 처리
+ * 렌더러에서 30초마다 전송되는 동작 품질 메트릭을 분석하고,
+ * 이상을 감지하여 행동 패턴을 자동 조정한다.
+ *
+ * @param {object} data - { metrics: {...}, timestamp }
+ */
+function handleMetrics(data) {
+  if (!data || !data.metrics) return;
+  const metrics = data.metrics;
+  latestMetrics = metrics;
+
+  // 이력 유지 (최근 10개)
+  metricsHistory.push(metrics);
+  if (metricsHistory.length > 10) metricsHistory.shift();
+
+  // 이상 감지 및 반응
+  _detectAnomalies(metrics);
+
+  // 행동 자동 조정
+  adjustBehavior(metrics);
+
+  // 주기적 품질 보고서 (5분마다 콘솔 로그)
+  const now = Date.now();
+  if (now - lastMetricsLogTime >= 5 * 60 * 1000) {
+    lastMetricsLogTime = now;
+    _logQualityReport(metrics);
+  }
+}
+
+/**
+ * 이상 감지: 메트릭 임계값을 초과하면 즉시 반응
+ *
+ * - FPS < 30 → 성능 경고, 행동 빈도 축소
+ * - idle 비율 > 80% → 너무 멈춰있음, 활동 촉진
+ * - 탐험 커버리지 < 30% → 새 영역 탐험 유도
+ * - 사용자 클릭 0회 (장시간) → 관심 끌기 행동
+ */
+function _detectAnomalies(metrics) {
+  if (!connector || !connector.connected) return;
+
+  // --- FPS 저하 감지 ---
+  if (metrics.fps < 30 && metrics.fps > 0) {
+    console.log(`[ClawMate][Metrics] FPS 저하 감지: ${metrics.fps}`);
+    connector.speak('화면이 좀 버벅이네... 잠깐 쉴게.');
+    connector.action('idle');
+
+    // 행동 빈도를 즉시 줄여 렌더링 부하 감소
+    behaviorAdjustments.actionCooldownMultiplier = 3.0;
+    behaviorAdjustments.speechCooldownMultiplier = 2.0;
+    behaviorAdjustments.activityLevel = 0.5;
+    return; // FPS 문제 시 다른 조정은 보류
+  }
+
+  // --- idle 비율 과다 ---
+  if (metrics.idleRatio > 0.8) {
+    console.log(`[ClawMate][Metrics] idle 비율 과다: ${(metrics.idleRatio * 100).toFixed(0)}%`);
+
+    // 10% 확률로 각성 멘트 (매번 말하면 스팸)
+    if (Math.random() < 0.1) {
+      const idleReactions = [
+        '가만히 있으면 재미없지! 좀 돌아다녀볼까~',
+        '멍때리고 있었네... 움직여야지!',
+        '심심해~ 탐험 가자!',
+      ];
+      const text = idleReactions[Math.floor(Math.random() * idleReactions.length)];
+      connector.speak(text);
+    }
+  }
+
+  // --- 탐험 커버리지 부족 ---
+  if (metrics.explorationCoverage < 0.3 && metrics.period >= 25000) {
+    console.log(`[ClawMate][Metrics] 탐험 커버리지 부족: ${(metrics.explorationCoverage * 100).toFixed(0)}%`);
+
+    // 5% 확률로 탐험 유도 (빈도 조절)
+    if (Math.random() < 0.05) {
+      connector.speak('아직 안 가본 곳이 많네~ 탐험해볼까!');
+    }
+  }
+
+  // --- 사용자 상호작용 감소 ---
+  // 최근 3개 보고에서 연속으로 클릭 0회이면 관심 끌기
+  if (metricsHistory.length >= 3) {
+    const recent3 = metricsHistory.slice(-3);
+    const noClicks = recent3.every(m => (m.userClicks || 0) === 0);
+    if (noClicks) {
+      // 5% 확률로 관심 끌기 (연속 감지 시)
+      if (Math.random() < 0.05) {
+        connector.decide({
+          action: 'excited',
+          speech: '나 여기 있어~ 심심하면 클릭해줘!',
+          emotion: 'playful',
+        });
+        console.log('[ClawMate][Metrics] 사용자 상호작용 감소 → 관심 끌기');
+      }
+    }
+  }
+}
+
+/**
+ * 행동 패턴 자동 조정
+ * 메트릭 데이터를 기반으로 행동 빈도/패턴을 실시간 튜닝한다.
+ *
+ * 조정 원칙:
+ *   - FPS가 낮으면 행동 빈도를 줄여 렌더링 부하 감소
+ *   - idle이 너무 많으면 행동을 활발하게
+ *   - 탐험 커버리지가 낮으면 탐험 확률 증가
+ *   - 사용자 상호작용이 활발하면 대응 빈도 증가
+ *
+ * @param {object} metrics - 현재 메트릭 데이터
+ */
+function adjustBehavior(metrics) {
+  // --- FPS 기반 활동 수준 조절 ---
+  if (metrics.fps >= 50) {
+    // 충분한 성능 → 정상 활동
+    behaviorAdjustments.activityLevel = 1.0;
+    behaviorAdjustments.actionCooldownMultiplier = 1.0;
+  } else if (metrics.fps >= 30) {
+    // 성능 약간 부족 → 활동 약간 축소
+    behaviorAdjustments.activityLevel = 0.8;
+    behaviorAdjustments.actionCooldownMultiplier = 1.5;
+  } else {
+    // 성능 부족 → 활동 대폭 축소 (_detectAnomalies에서 이미 처리)
+    behaviorAdjustments.activityLevel = 0.5;
+    behaviorAdjustments.actionCooldownMultiplier = 3.0;
+  }
+
+  // --- idle 비율 기반 활동 조절 ---
+  if (metrics.idleRatio > 0.8) {
+    // 너무 멈춰있음 → 행동 쿨타임 단축, 활동 수준 증가
+    behaviorAdjustments.actionCooldownMultiplier = Math.max(0.5,
+      behaviorAdjustments.actionCooldownMultiplier * 0.7);
+    behaviorAdjustments.activityLevel = Math.min(1.5,
+      behaviorAdjustments.activityLevel * 1.3);
+  } else if (metrics.idleRatio < 0.1) {
+    // 너무 바쁨 → 약간 쉬게
+    behaviorAdjustments.actionCooldownMultiplier = Math.max(1.0,
+      behaviorAdjustments.actionCooldownMultiplier * 1.2);
+  }
+
+  // --- 탐험 커버리지 기반 탐험 편향 ---
+  if (metrics.explorationCoverage < 0.3) {
+    // 탐험 부족 → 탐험 확률 증가
+    behaviorAdjustments.explorationBias = 0.15;
+  } else if (metrics.explorationCoverage > 0.7) {
+    // 충분히 탐험함 → 탐험 확률 기본으로
+    behaviorAdjustments.explorationBias = 0;
+  } else {
+    // 중간 → 약간 증가
+    behaviorAdjustments.explorationBias = 0.05;
+  }
+
+  // --- 사용자 상호작용 기반 말풍선 빈도 ---
+  if (metrics.userClicks > 3) {
+    // 사용자가 활발히 클릭 → 말풍선 빈도 증가 (반응적)
+    behaviorAdjustments.speechCooldownMultiplier = 0.7;
+  } else if (metrics.userClicks === 0 && metrics.speechCount > 5) {
+    // 사용자 무반응인데 말이 많음 → 말풍선 줄이기
+    behaviorAdjustments.speechCooldownMultiplier = 1.5;
+  } else {
+    behaviorAdjustments.speechCooldownMultiplier = 1.0;
+  }
+
+  // 값 범위 클램핑 (안전 장치)
+  behaviorAdjustments.activityLevel = Math.max(0.3, Math.min(2.0, behaviorAdjustments.activityLevel));
+  behaviorAdjustments.actionCooldownMultiplier = Math.max(0.3, Math.min(5.0, behaviorAdjustments.actionCooldownMultiplier));
+  behaviorAdjustments.speechCooldownMultiplier = Math.max(0.3, Math.min(5.0, behaviorAdjustments.speechCooldownMultiplier));
+  behaviorAdjustments.explorationBias = Math.max(-0.15, Math.min(0.3, behaviorAdjustments.explorationBias));
+}
+
+/**
+ * 품질 보고서 콘솔 출력 (5분마다)
+ * OpenClaw 개발자/운영자가 펫의 동작 품질을 모니터링할 수 있도록 한다.
+ */
+function _logQualityReport(metrics) {
+  const adj = behaviorAdjustments;
+  console.log('=== [ClawMate] 동작 품질 보고서 ===');
+  console.log(`  FPS: ${metrics.fps} | 프레임 일관성: ${metrics.animationFrameConsistency}`);
+  console.log(`  이동 부드러움: ${metrics.movementSmoothness} | 벽면 밀착: ${metrics.wallContactAccuracy}`);
+  console.log(`  idle 비율: ${(metrics.idleRatio * 100).toFixed(0)}% | 탐험 커버리지: ${(metrics.explorationCoverage * 100).toFixed(0)}%`);
+  console.log(`  응답 시간: ${metrics.interactionResponseMs}ms | 말풍선: ${metrics.speechCount}회 | 클릭: ${metrics.userClicks}회`);
+  console.log(`  [조정] 활동수준: ${adj.activityLevel.toFixed(2)} | 행동쿨타임: x${adj.actionCooldownMultiplier.toFixed(2)} | 말풍선쿨타임: x${adj.speechCooldownMultiplier.toFixed(2)} | 탐험편향: ${adj.explorationBias.toFixed(2)}`);
+  console.log('====================================');
 }
 
 // =====================================================

@@ -23,6 +23,7 @@ const StateMachine = (() => {
     JUMPING: 'jumping',       // 포물선 점프 중 (물리 엔진이 제어)
     RAPPELLING: 'rappelling', // 실(thread)을 타고 하강 중
     FALLING: 'falling',       // 중력에 의한 자유 낙하 중
+    CUSTOM: 'custom',         // 커스텀 이동 패턴 실행 중 (Movement Registry)
   };
 
   // 각 상태의 최소/최대 지속 시간(ms)
@@ -41,6 +42,7 @@ const StateMachine = (() => {
     [STATES.JUMPING]:       { min: 500, max: 2000 },    // 점프 비행 시간
     [STATES.RAPPELLING]:    { min: 2000, max: 8000 },   // 레펠 하강 시간
     [STATES.FALLING]:       { min: 200, max: 1000 },    // 낙하 시간
+    [STATES.CUSTOM]:        { min: 500, max: 30000 },   // 커스텀 이동 (패턴에 따라 가변)
   };
 
   let currentState = STATES.IDLE;
@@ -114,6 +116,11 @@ const StateMachine = (() => {
     // 낙하 후: 착지하면 idle
     [STATES.FALLING]: [
       { state: STATES.IDLE, weight: 1.0 },
+    ],
+    // 커스텀 이동 완료 후: idle 또는 walking
+    [STATES.CUSTOM]: [
+      { state: STATES.IDLE, weight: 0.6 },
+      { state: STATES.WALKING, weight: 0.4 },
     ],
   };
 
