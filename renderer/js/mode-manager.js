@@ -24,8 +24,8 @@ const ModeManager = (() => {
 
     // 캐릭터 색상 업데이트
     const colors = mode === 'pet'
-      ? { primary: '#ff4f40', secondary: '#ff775f', dark: '#3a0a0d', eye: '#ffffff', pupil: '#111111', claw: '#ff4f40' }
-      : { primary: '#ff4f40', secondary: '#ff775f', dark: '#3a0a0d', eye: '#00BFA5', pupil: '#004D40', claw: '#ff4f40' };
+      ? { primary: '#ff4f40', secondary: '#ff775f', dark: '#8B4513', eye: '#ffffff', pupil: '#111111', claw: '#ff4f40' }
+      : { primary: '#ff4f40', secondary: '#ff775f', dark: '#8B4513', eye: '#00BFA5', pupil: '#004D40', claw: '#ff4f40' };
     Character.setColorMap(colors);
 
     // 속도 조정

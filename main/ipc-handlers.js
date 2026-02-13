@@ -1,4 +1,4 @@
-const { ipcMain, screen } = require('electron');
+const { ipcMain, screen, desktopCapturer } = require('electron');
 const { getDesktopFiles, moveFile, undoFileMove, undoAllMoves, getFileManifest } = require('./file-ops');
 const Store = require('./store');
 
@@ -60,6 +60,35 @@ function registerIpcHandlers(getMainWindow, getAIBridge) {
   ipcMain.handle('get-screen-size', () => {
     const { width, height } = screen.getPrimaryDisplay().workAreaSize;
     return { width, height };
+  });
+
+  // 화면 캡처
+  ipcMain.handle('capture-screen', async () => {
+    try {
+      const primaryDisplay = screen.getPrimaryDisplay();
+      const { width, height } = primaryDisplay.size;
+
+      const sources = await desktopCapturer.getSources({
+        types: ['screen'],
+        thumbnailSize: { width: Math.min(width, 1920), height: Math.min(height, 1080) }
+      });
+
+      if (sources.length > 0) {
+        // NativeImage를 base64 JPEG로 변환 (크기 최적화)
+        const thumbnail = sources[0].thumbnail;
+        const jpegBuffer = thumbnail.toJPEG(60);
+        return {
+          success: true,
+          image: jpegBuffer.toString('base64'),
+          width: thumbnail.getSize().width,
+          height: thumbnail.getSize().height,
+          timestamp: Date.now()
+        };
+      }
+      return { success: false, error: 'No screen source found' };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
   });
 
   // === OpenClaw AI 통신 ===

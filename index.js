@@ -20,6 +20,16 @@ let connector = null;
 let electronProcess = null;
 let apiRef = null;
 
+// =====================================================
+// Think Loop 상태 관리
+// =====================================================
+let thinkTimer = null;
+let lastSpeechTime = 0;
+let lastActionTime = 0;
+let lastDesktopCheckTime = 0;
+let lastScreenCheckTime = 0;
+let lastGreetingDate = null;  // 하루에 한번만 인사
+
 module.exports = {
   id: 'clawmate',
   name: 'ClawMate',
@@ -34,6 +44,10 @@ module.exports = {
     apiRef = api;
     console.log('[ClawMate] 플러그인 초기화 — 자동 연결 시작');
     autoConnect();
+
+    // npm 패키지 버전 체크 (최초 1회 + 24시간 간격)
+    checkNpmUpdate();
+    setInterval(checkNpmUpdate, 24 * 60 * 60 * 1000);
   },
 
   register(api) {
@@ -101,6 +115,7 @@ module.exports = {
    */
   async destroy() {
     console.log('[ClawMate] 플러그인 정리');
+    stopThinkLoop();
     if (connector) {
       connector.disconnect();
       connector = null;
@@ -209,7 +224,8 @@ function setupConnectorEvents() {
   });
 
   connector.on('disconnected', () => {
-    console.log('[ClawMate] 연결 끊김 — 재연결 시도');
+    console.log('[ClawMate] 연결 끊김 — Think Loop 중단, 재연결 시도');
+    stopThinkLoop();
     startBackgroundReconnect();
   });
 
@@ -225,6 +241,7 @@ function onConnected() {
   if (connector && connector.connected) {
     connector.speak('OpenClaw 연결됨! 같이 놀자!');
     connector.action('excited');
+    startThinkLoop();
   }
 }
 
@@ -343,4 +360,350 @@ async function handleUserEvent(event) {
 
 function sleep(ms) {
   return new Promise(r => setTimeout(r, ms));
+}
+
+// =====================================================
+// AI Think Loop — 주기적 자율 사고 시스템
+// =====================================================
+
+// 시간대별 인사말
+const TIME_GREETINGS = {
+  morning: [
+    '좋은 아침! 오늘 하루도 화이팅!',
+    '일어났어? 커피 한 잔 어때?',
+    '모닝~ 오늘 날씨 어떨까?',
+  ],
+  lunch: [
+    '점심 시간이다! 뭐 먹을 거야?',
+    '밥 먹었어? 건강이 최고야!',
+    '슬슬 배고프지 않아?',
+  ],
+  evening: [
+    '오늘 하루 수고했어!',
+    '저녁이네~ 오늘 뭐 했어?',
+    '하루가 벌써 이렇게 지나가다니...',
+  ],
+  night: [
+    '이 시간까지 깨있는 거야? 곧 자야지~',
+    '밤이 깊었어... 내일도 있잖아.',
+    '나는 슬슬 졸리다... zzZ',
+  ],
+};
+
+// 한가할 때 혼잣말 목록
+const IDLE_CHATTER = [
+  '음~ 뭐 하고 놀까...',
+  '심심하다...',
+  '나 여기 있는 거 알지?',
+  '바탕화면 구경 중~',
+  '오늘 기분이 좋다!',
+  '후후, 잠깐 스트레칭~',
+  '이리저리 돌아다녀볼까~',
+  '혼자 놀기 프로...',
+  '주인님 뭐 하고 있는 거야~?',
+  '나한테 관심 좀 줘봐!',
+  '데스크톱이 넓고 좋다~',
+  '여기서 보이는 게 다 내 세상!',
+];
+
+// 랜덤 행동 목록
+const RANDOM_ACTIONS = [
+  { action: 'walking', weight: 30, minInterval: 5000 },
+  { action: 'idle', weight: 25, minInterval: 3000 },
+  { action: 'excited', weight: 10, minInterval: 15000 },
+  { action: 'climbing', weight: 8, minInterval: 20000 },
+  { action: 'looking_around', weight: 20, minInterval: 8000 },
+  { action: 'sleeping', weight: 7, minInterval: 60000 },
+];
+
+/**
+ * Think Loop 시작
+ * 3초 간격으로 AI가 자율적으로 사고하고 행동을 결정
+ */
+function startThinkLoop() {
+  if (thinkTimer) return;
+  console.log('[ClawMate] Think Loop 시작 — 3초 간격 자율 사고');
+
+  // 초기 타임스탬프 설정 (시작 직후 스팸 방지)
+  const now = Date.now();
+  lastSpeechTime = now;
+  lastActionTime = now;
+  lastDesktopCheckTime = now;
+  lastScreenCheckTime = now;
+
+  thinkTimer = setInterval(async () => {
+    try {
+      await thinkCycle();
+    } catch (err) {
+      console.error('[ClawMate] Think Loop 오류:', err.message);
+    }
+  }, 3000);
+}
+
+/**
+ * Think Loop 중단
+ */
+function stopThinkLoop() {
+  if (thinkTimer) {
+    clearInterval(thinkTimer);
+    thinkTimer = null;
+    console.log('[ClawMate] Think Loop 중단');
+  }
+}
+
+/**
+ * 단일 사고 사이클 — 매 3초마다 실행
+ */
+async function thinkCycle() {
+  if (!connector || !connector.connected) return;
+
+  const now = Date.now();
+  const date = new Date();
+  const hour = date.getHours();
+  const todayStr = date.toISOString().slice(0, 10);
+
+  // 펫 상태 조회 (캐시된 값 또는 실시간)
+  const state = await connector.queryState(1500);
+
+  // --- 1) 시간대별 인사 (하루에 한번씩, 시간대별) ---
+  const greetingHandled = handleTimeGreeting(now, hour, todayStr);
+
+  // --- 2) 야간 수면 모드 (23시~5시: 말/행동 빈도 대폭 감소) ---
+  const isNightMode = hour >= 23 || hour < 5;
+
+  // --- 3) 자율 발화 (30초 쿨타임 + 확률) ---
+  if (!greetingHandled) {
+    handleIdleSpeech(now, isNightMode);
+  }
+
+  // --- 4) 자율 행동 결정 (5초 쿨타임 + 확률) ---
+  handleRandomAction(now, hour, isNightMode, state);
+
+  // --- 5) 바탕화면 파일 체크 (5분 간격) ---
+  handleDesktopCheck(now);
+
+  // --- 6) 화면 관찰 (2분 간격, 10% 확률) ---
+  handleScreenObservation(now);
+}
+
+/**
+ * 시간대별 인사 처리
+ * 아침/점심/저녁/밤 각각 하루 한 번
+ */
+function handleTimeGreeting(now, hour, todayStr) {
+  // 시간대 결정
+  let period = null;
+  if (hour >= 6 && hour < 9) period = 'morning';
+  else if (hour >= 11 && hour < 13) period = 'lunch';
+  else if (hour >= 17 && hour < 19) period = 'evening';
+  else if (hour >= 22 && hour < 24) period = 'night';
+
+  if (!period) return false;
+
+  const greetingKey = `${todayStr}_${period}`;
+  if (lastGreetingDate === greetingKey) return false;
+
+  // 시간대 인사 전송
+  lastGreetingDate = greetingKey;
+  const greetings = TIME_GREETINGS[period];
+  const text = greetings[Math.floor(Math.random() * greetings.length)];
+
+  const emotionMap = {
+    morning: 'happy',
+    lunch: 'curious',
+    evening: 'content',
+    night: 'sleepy',
+  };
+  const actionMap = {
+    morning: 'excited',
+    lunch: 'walking',
+    evening: 'idle',
+    night: 'sleeping',
+  };
+
+  connector.decide({
+    action: actionMap[period],
+    speech: text,
+    emotion: emotionMap[period],
+  });
+  lastSpeechTime = Date.now();
+  console.log(`[ClawMate] 시간대 인사 (${period}): ${text}`);
+  return true;
+}
+
+/**
+ * 한가할 때 혼잣말
+ * 최소 30초 쿨타임, 야간에는 확률 대폭 감소
+ */
+function handleIdleSpeech(now, isNightMode) {
+  const speechCooldown = 30000; // 30초
+  if (now - lastSpeechTime < speechCooldown) return;
+
+  // 야간: 5% 확률 / 주간: 25% 확률
+  const speechChance = isNightMode ? 0.05 : 0.25;
+  if (Math.random() > speechChance) return;
+
+  const text = IDLE_CHATTER[Math.floor(Math.random() * IDLE_CHATTER.length)];
+  connector.speak(text);
+  lastSpeechTime = now;
+  console.log(`[ClawMate] 혼잣말: ${text}`);
+}
+
+/**
+ * 자율 행동 결정
+ * 최소 5초 쿨타임, 가중치 기반 랜덤 선택
+ */
+function handleRandomAction(now, hour, isNightMode, state) {
+  const actionCooldown = 5000; // 5초
+  if (now - lastActionTime < actionCooldown) return;
+
+  // 야간: 10% 확률 / 주간: 40% 확률
+  const actionChance = isNightMode ? 0.1 : 0.4;
+  if (Math.random() > actionChance) return;
+
+  // 야간에는 sleeping 가중치 대폭 상승
+  const actions = RANDOM_ACTIONS.map(a => {
+    let weight = a.weight;
+    if (isNightMode) {
+      if (a.action === 'sleeping') weight = 60;
+      else if (a.action === 'excited' || a.action === 'climbing') weight = 2;
+    }
+    // 새벽/아침에는 looking_around 선호
+    if (hour >= 6 && hour < 9 && a.action === 'looking_around') weight += 15;
+    return { ...a, weight };
+  });
+
+  // 최근 동일 행동 반복 방지: 현재 상태와 같으면 가중치 감소
+  const currentAction = state?.action || state?.state;
+  if (currentAction) {
+    const match = actions.find(a => a.action === currentAction);
+    if (match) match.weight = Math.max(1, Math.floor(match.weight * 0.3));
+  }
+
+  const selected = weightedRandom(actions);
+  if (!selected) return;
+
+  // minInterval 체크
+  if (now - lastActionTime < selected.minInterval) return;
+
+  connector.action(selected.action);
+  lastActionTime = now;
+}
+
+/**
+ * 바탕화면 파일 체크 (5분 간격)
+ * 데스크톱 폴더를 읽어서 재밌는 코멘트
+ */
+function handleDesktopCheck(now) {
+  const checkInterval = 5 * 60 * 1000; // 5분
+  if (now - lastDesktopCheckTime < checkInterval) return;
+  lastDesktopCheckTime = now;
+
+  // 15% 확률로만 실행 (매번 할 필요 없음)
+  if (Math.random() > 0.15) return;
+
+  try {
+    const desktopPath = path.join(os.homedir(), 'Desktop');
+    if (!fs.existsSync(desktopPath)) return;
+
+    const files = fs.readdirSync(desktopPath);
+    if (files.length === 0) {
+      connector.speak('바탕화면이 깨끗하네! 좋아!');
+      lastSpeechTime = now;
+      return;
+    }
+
+    // 파일 종류별 코멘트
+    const images = files.filter(f => /\.(png|jpg|jpeg|gif|bmp|webp)$/i.test(f));
+    const docs = files.filter(f => /\.(pdf|doc|docx|xlsx|pptx|txt|hwp)$/i.test(f));
+    const zips = files.filter(f => /\.(zip|rar|7z|tar|gz)$/i.test(f));
+
+    let comment = null;
+    if (files.length > 20) {
+      comment = `바탕화면에 파일이 ${files.length}개나 있어! 정리 좀 할까?`;
+    } else if (images.length > 5) {
+      comment = `사진이 많네~ ${images.length}개나! 앨범 정리 어때?`;
+    } else if (zips.length > 3) {
+      comment = `압축 파일이 좀 쌓였네... 풀어볼 거 있어?`;
+    } else if (docs.length > 0) {
+      comment = `문서 작업 중이구나~ 화이팅!`;
+    } else if (files.length <= 3) {
+      comment = '바탕화면이 깔끔해서 기분 좋다~';
+    }
+
+    if (comment) {
+      connector.decide({
+        action: 'looking_around',
+        speech: comment,
+        emotion: 'curious',
+      });
+      lastSpeechTime = now;
+      console.log(`[ClawMate] 바탕화면 체크: ${comment}`);
+    }
+  } catch {
+    // 데스크톱 접근 실패 — 무시
+  }
+}
+
+/**
+ * 화면 관찰 (2분 간격, 10% 확률)
+ * 스크린샷을 캡처해서 OpenClaw AI가 화면 내용을 인식
+ */
+function handleScreenObservation(now) {
+  const screenCheckInterval = 2 * 60 * 1000; // 2분
+  if (now - lastScreenCheckTime < screenCheckInterval) return;
+
+  // 10% 확률로만 실행 (리소스 절약)
+  if (Math.random() > 0.1) return;
+
+  lastScreenCheckTime = now;
+
+  if (!connector || !connector.connected) return;
+
+  connector.requestScreenCapture();
+  console.log('[ClawMate] 화면 캡처 요청');
+}
+
+/**
+ * 가중치 기반 랜덤 선택
+ */
+function weightedRandom(items) {
+  const totalWeight = items.reduce((sum, item) => sum + item.weight, 0);
+  if (totalWeight <= 0) return null;
+
+  let random = Math.random() * totalWeight;
+  for (const item of items) {
+    random -= item.weight;
+    if (random <= 0) return item;
+  }
+  return items[items.length - 1];
+}
+
+// =====================================================
+// npm 패키지 버전 체크 (npm install -g 사용자용)
+// =====================================================
+
+/**
+ * npm registry에서 최신 버전을 확인하고,
+ * 현재 버전과 다르면 콘솔 + 펫 말풍선으로 알림
+ */
+async function checkNpmUpdate() {
+  try {
+    const { execSync } = require('child_process');
+    const latest = execSync('npm view clawmate version', {
+      encoding: 'utf-8',
+      timeout: 10000,
+    }).trim();
+    const current = require('./package.json').version;
+
+    if (latest !== current) {
+      console.log(`[ClawMate] 새 버전 ${latest} 사용 가능 (현재: ${current})`);
+      console.log('[ClawMate] 업데이트: npm update -g clawmate');
+      if (connector && connector.connected) {
+        connector.speak(`업데이트가 있어! v${latest}`);
+      }
+    }
+  } catch {
+    // npm registry 접근 실패 — 무시 (오프라인 등)
+  }
 }

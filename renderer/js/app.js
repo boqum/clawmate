@@ -19,7 +19,7 @@
   Character.setColorMap({
     primary: '#ff4f40',
     secondary: '#ff775f',
-    dark: '#3a0a0d',
+    dark: '#8B4513',
     eye: '#ffffff',
     pupil: '#111111',
     claw: '#ff4f40',

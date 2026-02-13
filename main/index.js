@@ -1,4 +1,4 @@
-const { app, BrowserWindow, screen } = require('electron');
+const { app, BrowserWindow, screen, desktopCapturer } = require('electron');
 const path = require('path');
 const { setupTray } = require('./tray');
 const { registerIpcHandlers } = require('./ipc-handlers');
@@ -88,6 +88,31 @@ function startAIBridge(win) {
     });
   });
 
+  // OpenClaw 화면 캡처 요청 처리 (main process에서 직접 캡처)
+  aiBridge.on('query_screen', async () => {
+    try {
+      const primaryDisplay = screen.getPrimaryDisplay();
+      const { width, height } = primaryDisplay.size;
+
+      const sources = await desktopCapturer.getSources({
+        types: ['screen'],
+        thumbnailSize: { width: Math.min(width, 1280), height: Math.min(height, 720) }
+      });
+
+      if (sources.length > 0) {
+        const thumbnail = sources[0].thumbnail;
+        const jpegBuffer = thumbnail.toJPEG(50);
+        aiBridge.reportScreenCapture(
+          jpegBuffer.toString('base64'),
+          thumbnail.getSize().width,
+          thumbnail.getSize().height
+        );
+      }
+    } catch (err) {
+      console.error('[AI Bridge] 화면 캡처 실패:', err.message);
+    }
+  });
+
   // 연결/해제 이벤트
   aiBridge.on('connected', () => {
     if (win && !win.isDestroyed()) {
@@ -115,6 +140,10 @@ app.whenReady().then(() => {
   if (!isAutoStartEnabled()) {
     enableAutoStart();
   }
+
+  // 자동 업데이트 확인 (빌드된 앱에서만 동작)
+  const { checkForUpdates } = require('./updater');
+  checkForUpdates();
 });
 
 app.on('window-all-closed', () => {

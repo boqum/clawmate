@@ -21,3 +21,14 @@ mac:
     - dmg
   icon: assets/icons/clawmate.icns
   category: public.app-category.entertainment
+linux:
+  target:
+    - AppImage
+    - deb
+    - snap
+  icon: assets/icons/clawmate.png
+  category: Entertainment
+publish:
+  provider: github
+  owner: boqum
+  repo: clawmate

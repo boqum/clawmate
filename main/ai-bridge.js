@@ -240,6 +240,15 @@ class AIBridge extends EventEmitter {
     });
   }
 
+  reportScreenCapture(imageBase64, width, height) {
+    this.send('screen_capture', {
+      image: imageBase64,
+      width,
+      height,
+      timestamp: Date.now(),
+    });
+  }
+
   // === 상태 업데이트 ===
 
   updatePetState(updates) {

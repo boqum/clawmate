@@ -53,11 +53,24 @@ const PetEngine = (() => {
     petContainer.style.left = x + 'px';
     petContainer.style.top = y + 'px';
 
-    // 천장에 있을 때는 캐릭터를 뒤집음
+    // 가장자리별 회전/반전 — 다리(캐릭터 하단)가 항상 해당 가장자리를 향하도록
     let transform = '';
-    if (flipX) transform += 'scaleX(-1) ';
-    if (edge === 'top') transform += 'scaleY(-1) ';
-    if (edge === 'left' || edge === 'right') transform += 'rotate(90deg) ';
+    if (edge === 'left') {
+      // 왼쪽 벽: 다리가 왼쪽(화면 가장자리)을 향하도록 반시계 회전
+      transform += 'rotate(-90deg) ';
+      if (flipX) transform += 'scaleX(-1) ';
+    } else if (edge === 'right') {
+      // 오른쪽 벽: 다리가 오른쪽(화면 가장자리)을 향하도록 시계 회전
+      transform += 'rotate(90deg) ';
+      if (flipX) transform += 'scaleX(-1) ';
+    } else if (edge === 'top') {
+      // 천장: 다리가 위(천장)를 향하도록 상하 반전
+      transform += 'scaleY(-1) ';
+      if (flipX) transform += 'scaleX(-1) ';
+    } else {
+      // 바닥: 기본 자세 (다리가 아래를 향함)
+      if (flipX) transform += 'scaleX(-1) ';
+    }
     petContainer.style.transform = transform.trim() || 'none';
   }
 

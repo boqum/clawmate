@@ -23,6 +23,7 @@ class OpenClawConnector extends EventEmitter {
     this.petState = null;
     this._reconnectTimer = null;
     this._autoReconnect = true;
+    this._stateResolvers = [];
   }
 
   /**
@@ -72,11 +73,21 @@ class OpenClawConnector extends EventEmitter {
       case 'pet_state_update':
         this.petState = payload;
         this.emit('state_update', payload);
+        // queryState() Promise 해소
+        if (type === 'state_response' && this._stateResolvers.length > 0) {
+          const resolver = this._stateResolvers.shift();
+          resolver(payload);
+        }
         break;
 
       case 'user_event':
         // 사용자 이벤트 → OpenClaw AI가 반응 결정
         this.emit('user_event', payload);
+        break;
+
+      case 'screen_capture':
+        // 화면 캡처 응답 → OpenClaw AI가 분석
+        this.emit('screen_capture', payload);
         break;
 
       case 'heartbeat':
@@ -149,9 +160,36 @@ class OpenClawConnector extends EventEmitter {
     return this._send('ai_decision', decision);
   }
 
-  /** 현재 펫 상태 요청 */
-  queryState() {
-    return this._send('query_state', {});
+  /**
+   * 현재 펫 상태 요청 (Promise 반환)
+   * 서버에서 state_response가 오면 resolve, 타임아웃 시 캐시된 상태 반환
+   */
+  queryState(timeout = 2000) {
+    return new Promise((resolve) => {
+      const sent = this._send('query_state', {});
+      if (!sent) {
+        resolve(this.petState);
+        return;
+      }
+      this._stateResolvers.push(resolve);
+      setTimeout(() => {
+        const idx = this._stateResolvers.indexOf(resolve);
+        if (idx !== -1) {
+          this._stateResolvers.splice(idx, 1);
+          resolve(this.petState);
+        }
+      }, timeout);
+    });
+  }
+
+  /** 화면 캡처 요청 (ClawMate에서 스크린샷 촬영 후 응답) */
+  requestScreenCapture() {
+    return this._send('query_screen', {});
+  }
+
+  /** 화면 캡처 응답 리스너 등록 */
+  onScreenCapture(callback) {
+    this.on('screen_capture', callback);
   }
 
   /** 사용자 이벤트 리스너 등록 */

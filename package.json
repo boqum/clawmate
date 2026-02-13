@@ -1,6 +1,6 @@
 {
   "name": "clawmate",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "OpenClaw 데스크톱 펫 - AI가 조종하는 화면 위의 살아있는 Claw",
   "main": "main/index.js",
   "bin": {
@@ -14,7 +14,8 @@
     "start": "electron .",
     "build": "electron-builder",
     "build:win": "electron-builder --win",
-    "build:mac": "electron-builder --mac"
+    "build:mac": "electron-builder --mac",
+    "build:linux": "electron-builder --linux"
   },
   "keywords": [
     "openclaw",
@@ -27,6 +28,7 @@
   "license": "MIT",
   "homepage": "https://github.com/boqum/clawmate",
   "dependencies": {
+    "electron-updater": "^6.0.0",
     "ws": "^8.18.0"
   },
   "devDependencies": {

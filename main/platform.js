@@ -15,6 +15,15 @@ function getDesktopPath() {
     } catch {}
     return path.join(os.homedir(), 'Desktop');
   }
+  if (platform === 'linux') {
+    try {
+      const result = execSync('xdg-user-dir DESKTOP', {
+        encoding: 'utf-8',
+      }).trim();
+      if (result) return result;
+    } catch {}
+    return path.join(os.homedir(), 'Desktop');
+  }
   return path.join(os.homedir(), 'Desktop');
 }
 
@@ -30,4 +39,8 @@ function isMac() {
   return platform === 'darwin';
 }
 
-module.exports = { getDesktopPath, getTrayIconExt, isWindows, isMac, platform };
+function isLinux() {
+  return platform === 'linux';
+}
+
+module.exports = { getDesktopPath, getTrayIconExt, isWindows, isMac, isLinux, platform };
