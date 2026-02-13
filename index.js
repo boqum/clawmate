@@ -41,7 +41,12 @@ module.exports = {
 
     // 펫 실행 (이미 돌고 있으면 상태 알려줌)
     api.registerSkill('launch-pet', {
-      triggers: ['펫 깔아줘', '펫 실행', 'clawmate', '데스크톱 펫', 'install pet', 'launch pet'],
+      triggers: [
+        '펫 깔아줘', '펫 실행', '펫 설치', '펫 켜줘', '펫 띄워줘',
+        'clawmate', 'clawmate 깔아줘', 'clawmate 설치', 'clawmate 켜줘',
+        '클로메이트', '클로메이트 깔아줘', '데스크톱 펫',
+        'install pet', 'install clawmate', 'launch pet',
+      ],
       description: '데스크톱 펫(ClawMate)을 실행하고 AI로 연결합니다',
       execute: async () => {
         if (connector && connector.connected) {
