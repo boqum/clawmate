@@ -1,6 +1,6 @@
 {
   "name": "clawmate",
-  "version": "1.4.1",
+  "version": "1.4.2",
   "description": "ClawMate - Give your AI a living body on screen",
   "main": "main/index.js",
   "bin": {
