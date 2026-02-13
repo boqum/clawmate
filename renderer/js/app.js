@@ -84,6 +84,11 @@
     BrowserWatcher.init();
   }
 
+  // Initialize proactive controller (activity-aware reactions)
+  if (typeof ProactiveController !== 'undefined') {
+    ProactiveController.init();
+  }
+
   // Start engine
   PetEngine.start();
 

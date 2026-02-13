@@ -345,6 +345,18 @@ class AIBridge extends EventEmitter {
     });
   }
 
+  /**
+   * Report proactive trigger event to AI
+   * Sent when ProactiveMonitor detects user activity patterns
+   */
+  reportProactiveEvent(triggerType, context) {
+    this.send('proactive_trigger', {
+      trigger: triggerType,
+      context,
+      timestamp: Date.now(),
+    });
+  }
+
   // === State Updates ===
 
   updatePetState(updates) {

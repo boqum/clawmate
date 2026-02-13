@@ -7,6 +7,22 @@ const execAsync = promisify(exec);
 
 const platform = os.platform();
 
+let _isWSL = null;
+function isWSL() {
+  if (_isWSL !== null) return _isWSL;
+  if (platform !== 'linux') {
+    _isWSL = false;
+    return false;
+  }
+  try {
+    const procVersion = require('fs').readFileSync('/proc/version', 'utf-8');
+    _isWSL = /microsoft/i.test(procVersion);
+  } catch {
+    _isWSL = false;
+  }
+  return _isWSL;
+}
+
 function getDesktopPath() {
   if (platform === 'win32') {
     try {
@@ -260,4 +276,4 @@ public class FGWin {
   }
 }
 
-module.exports = { getDesktopPath, getTrayIconExt, isWindows, isMac, isLinux, platform, getWindowPositions, getActiveWindowTitle };
+module.exports = { getDesktopPath, getTrayIconExt, isWindows, isMac, isLinux, isWSL, platform, getWindowPositions, getActiveWindowTitle };

@@ -4,11 +4,13 @@ const { setupTray } = require('./tray');
 const { registerIpcHandlers } = require('./ipc-handlers');
 const { AIBridge } = require('./ai-bridge');
 const { TelegramBot } = require('./telegram');
+const { ProactiveMonitor } = require('./proactive-monitor');
 
 let mainWindow = null;
 let launcherWindow = null;
 let aiBridge = null;
 let telegramBot = null;
+let proactiveMonitor = null;
 
 function createMainWindow() {
   const { width, height } = screen.getPrimaryDisplay().workAreaSize;
@@ -154,13 +156,21 @@ function startAIBridge(win) {
 }
 
 app.whenReady().then(() => {
-  registerIpcHandlers(() => mainWindow, () => aiBridge);
+  registerIpcHandlers(() => mainWindow, () => aiBridge, () => proactiveMonitor);
   const win = createMainWindow();
   const bridge = startAIBridge(win);
-  setupTray(win, bridge);
+  setupTray(win, bridge, () => proactiveMonitor);
 
   // Initialize Telegram bot (silently ignored if no token)
   telegramBot = new TelegramBot(bridge);
+
+  // Initialize Proactive Monitor
+  const Store = require('./store');
+  const configStore = new Store('clawmate-config', { proactiveEnabled: true });
+  proactiveMonitor = new ProactiveMonitor();
+  if (configStore.get('proactiveEnabled') !== false) {
+    proactiveMonitor.start(win, bridge);
+  }
 
   // Register auto-start on first install
   const { enableAutoStart, isAutoStartEnabled } = require('./autostart');
@@ -178,6 +188,7 @@ app.on('window-all-closed', () => {
 });
 
 app.on('before-quit', () => {
+  if (proactiveMonitor) proactiveMonitor.stop();
   if (telegramBot) telegramBot.stop();
   if (aiBridge) aiBridge.stop();
 });

@@ -17,7 +17,7 @@ const memoryStore = new Store('clawmate-memory', {
   milestones: [],
 });
 
-function registerIpcHandlers(getMainWindow, getAIBridge) {
+function registerIpcHandlers(getMainWindow, getAIBridge, getProactiveMonitor) {
   // Click-through control
   ipcMain.on('set-click-through', (event, ignore) => {
     const win = getMainWindow();
@@ -238,6 +238,29 @@ function registerIpcHandlers(getMainWindow, getAIBridge) {
   // Undo all smart moves
   ipcMain.handle('undo-all-smart-moves', async () => {
     return undoAllSmartMoves();
+  });
+
+  // === Proactive Monitor ===
+
+  ipcMain.handle('get-proactive-config', () => {
+    const monitor = getProactiveMonitor ? getProactiveMonitor() : null;
+    return {
+      enabled: monitor ? monitor.enabled : false,
+    };
+  });
+
+  ipcMain.handle('set-proactive-enabled', (_, enabled) => {
+    const monitor = getProactiveMonitor ? getProactiveMonitor() : null;
+    if (monitor) {
+      if (enabled && !monitor.enabled) {
+        monitor.start(getMainWindow(), getAIBridge());
+      } else if (!enabled && monitor.enabled) {
+        monitor.stop();
+      }
+      monitor.enabled = enabled;
+    }
+    store.set('proactiveEnabled', enabled);
+    return enabled;
   });
 }
 

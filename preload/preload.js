@@ -78,4 +78,11 @@ contextBridge.exposeInMainWorld('clawmate', {
   smartFileOp: (command) => ipcRenderer.invoke('smart-file-op', command),
   undoSmartMove: (moveId) => ipcRenderer.invoke('undo-smart-move', moveId),
   undoAllSmartMoves: () => ipcRenderer.invoke('undo-all-smart-moves'),
+
+  // === Proactive Monitor ===
+  onProactiveEvent: (callback) => {
+    ipcRenderer.on('proactive-event', (_, event) => callback(event));
+  },
+  getProactiveConfig: () => ipcRenderer.invoke('get-proactive-config'),
+  setProactiveEnabled: (enabled) => ipcRenderer.invoke('set-proactive-enabled', enabled),
 });

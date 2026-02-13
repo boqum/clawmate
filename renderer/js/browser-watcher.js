@@ -37,6 +37,12 @@ const BrowserWatcher = (() => {
     // Don't comment when in sleeping state
     if (typeof StateMachine !== 'undefined' && StateMachine.getState() === 'sleeping') return;
 
+    // Skip if ProactiveController reacted within last 5 seconds (avoid duplicate reactions)
+    if (typeof ProactiveController !== 'undefined') {
+      const lastProactive = ProactiveController.getLastReactionTime();
+      if (Date.now() - lastProactive < 5000) return;
+    }
+
     try {
       const title = await window.clawmate.getActiveWindowTitle();
       if (!title) return;

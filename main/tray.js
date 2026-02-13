@@ -104,12 +104,13 @@ function createClawIcon() {
   return nativeImage.createFromBuffer(buffer, { width: size, height: size });
 }
 
-function setupTray(mainWindow, bridge) {
+function setupTray(mainWindow, bridge, getProactiveMonitor) {
   aiBridge = bridge;
   const store = new Store('clawmate-config', {
     mode: 'pet',
     character: 'default',
     telegramToken: '',
+    proactiveEnabled: true,
   });
 
   const icon = createClawIcon();
@@ -123,6 +124,7 @@ function setupTray(mainWindow, bridge) {
     const autoStart = isAutoStartEnabled();
     const currentChar = store.get('character') || 'default';
     const hasTelegramToken = !!(store.get('telegramToken'));
+    const proactiveEnabled = store.get('proactiveEnabled') !== false;
 
     // Character submenu
     const characterSubmenu = Object.entries(CHARACTER_PRESETS).map(([key, preset]) => ({
@@ -209,6 +211,29 @@ function setupTray(mainWindow, bridge) {
       { type: 'separator' },
 
       // === Settings ===
+      {
+        label: 'Proactive Mode',
+        sublabel: 'Pet reacts to your activity',
+        type: 'checkbox',
+        checked: proactiveEnabled,
+        click: (item) => {
+          store.set('proactiveEnabled', item.checked);
+          const monitor = getProactiveMonitor ? getProactiveMonitor() : null;
+          if (monitor) {
+            if (item.checked) {
+              if (!monitor.enabled) monitor.start(mainWindow, aiBridge);
+            } else {
+              monitor.stop();
+            }
+          }
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('ai-command', {
+              type: 'speak',
+              payload: { text: item.checked ? 'Proactive mode ON! I\'ll watch what you do~' : 'Proactive mode off. I\'ll mind my own business.' },
+            });
+          }
+        },
+      },
       {
         label: 'File Interaction',
         type: 'checkbox',
