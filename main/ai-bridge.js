@@ -152,6 +152,42 @@ class AIBridge extends EventEmitter {
         this.emit('accessorize', payload);
         break;
 
+      // === 공간 이동 명령 ===
+      case 'jump_to':
+        // 특정 위치로 점프
+        // payload: { x, y }
+        this.emit('jump_to', payload);
+        break;
+
+      case 'rappel':
+        // 레펠 (천장/벽에서 실 타고 내려가기)
+        // payload: {}
+        this.emit('rappel', payload);
+        break;
+
+      case 'release_thread':
+        // 레펠 실 해제 (낙하)
+        // payload: {}
+        this.emit('release_thread', payload);
+        break;
+
+      case 'move_to_center':
+        // 화면 중앙으로 이동
+        // payload: {}
+        this.emit('move_to_center', payload);
+        break;
+
+      case 'walk_on_window':
+        // 특정 윈도우 타이틀바 위로 이동
+        // payload: { windowId, x, y }
+        this.emit('walk_on_window', payload);
+        break;
+
+      case 'query_windows':
+        // 윈도우 위치 정보 요청 → main process에서 처리
+        this.emit('query_windows', payload);
+        break;
+
       // === 컨텍스트 질의 ===
       case 'query_state':
         // 현재 펫 상태 요청

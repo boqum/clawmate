@@ -20,6 +20,9 @@ const StateMachine = (() => {
     INTERACTING: 'interacting',
     SCARED: 'scared',
     EXCITED: 'excited',
+    JUMPING: 'jumping',       // 포물선 점프 중 (물리 엔진이 제어)
+    RAPPELLING: 'rappelling', // 실(thread)을 타고 하강 중
+    FALLING: 'falling',       // 중력에 의한 자유 낙하 중
   };
 
   // 각 상태의 최소/최대 지속 시간(ms)
@@ -35,6 +38,9 @@ const StateMachine = (() => {
     [STATES.INTERACTING]:   { min: 1500, max: 3000 },
     [STATES.SCARED]:        { min: 1000, max: 2000 },
     [STATES.EXCITED]:       { min: 1500, max: 3000 },
+    [STATES.JUMPING]:       { min: 500, max: 2000 },    // 점프 비행 시간
+    [STATES.RAPPELLING]:    { min: 2000, max: 8000 },   // 레펠 하강 시간
+    [STATES.FALLING]:       { min: 200, max: 1000 },    // 낙하 시간
   };
 
   let currentState = STATES.IDLE;
@@ -52,17 +58,19 @@ const StateMachine = (() => {
     ],
     [STATES.WALKING]: [
       { state: STATES.IDLE, weight: 0.3 },
-      { state: STATES.CLIMBING_UP, weight: 0.25 },
+      { state: STATES.CLIMBING_UP, weight: 0.2 },
       { state: STATES.WALKING, weight: 0.25 },
       { state: STATES.PLAYING, weight: 0.2 },
+      { state: STATES.JUMPING, weight: 0.05 },  // 가끔 점프 (낮은 확률)
     ],
     [STATES.CLIMBING_UP]: [
       { state: STATES.CEILING_WALK, weight: 0.5 },
       { state: STATES.CLIMBING_DOWN, weight: 0.5 },
     ],
     [STATES.CEILING_WALK]: [
-      { state: STATES.CLIMBING_DOWN, weight: 0.6 },
+      { state: STATES.CLIMBING_DOWN, weight: 0.4 },
       { state: STATES.CEILING_WALK, weight: 0.4 },
+      { state: STATES.RAPPELLING, weight: 0.2 },  // 천장에서 레펠로 하강
     ],
     [STATES.CLIMBING_DOWN]: [
       { state: STATES.WALKING, weight: 0.5 },
@@ -92,6 +100,20 @@ const StateMachine = (() => {
     [STATES.CARRYING]: [
       { state: STATES.IDLE, weight: 0.5 },
       { state: STATES.WALKING, weight: 0.5 },
+    ],
+    // 점프 후: 착지하면 idle 또는 walking으로
+    [STATES.JUMPING]: [
+      { state: STATES.IDLE, weight: 0.5 },
+      { state: STATES.WALKING, weight: 0.5 },
+    ],
+    // 레펠 후: 낙하하거나 착지
+    [STATES.RAPPELLING]: [
+      { state: STATES.FALLING, weight: 0.3 },
+      { state: STATES.IDLE, weight: 0.7 },
+    ],
+    // 낙하 후: 착지하면 idle
+    [STATES.FALLING]: [
+      { state: STATES.IDLE, weight: 1.0 },
     ],
   };
 

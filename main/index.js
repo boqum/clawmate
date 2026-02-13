@@ -78,6 +78,8 @@ function startAIBridge(win) {
     'action', 'move', 'emote', 'speak', 'think',
     'carry_file', 'drop_file', 'set_mode', 'evolve',
     'accessorize', 'ai_decision',
+    // 공간 이동 명령 (OpenClaw이 집처럼 돌아다니기)
+    'jump_to', 'rappel', 'release_thread', 'move_to_center', 'walk_on_window',
   ];
 
   commandTypes.forEach((type) => {
@@ -86,6 +88,18 @@ function startAIBridge(win) {
         win.webContents.send('ai-command', { type, payload });
       }
     });
+  });
+
+  // OpenClaw 윈도우 위치 정보 요청 처리
+  aiBridge.on('query_windows', async () => {
+    try {
+      const { getWindowPositions } = require('./platform');
+      const windows = await getWindowPositions();
+      aiBridge.send('window_positions', { windows });
+    } catch (err) {
+      console.error('[AI Bridge] 윈도우 목록 실패:', err.message);
+      aiBridge.send('window_positions', { windows: [] });
+    }
   });
 
   // OpenClaw 화면 캡처 요청 처리 (main process에서 직접 캡처)

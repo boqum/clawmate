@@ -128,6 +128,12 @@ function registerIpcHandlers(getMainWindow, getAIBridge) {
     const bridge = getAIBridge();
     return bridge ? bridge.isConnected() : false;
   });
+
+  // 열린 윈도우 위치/크기 조회
+  ipcMain.handle('get-window-positions', async () => {
+    const { getWindowPositions } = require('./platform');
+    return await getWindowPositions();
+  });
 }
 
 module.exports = { registerIpcHandlers };

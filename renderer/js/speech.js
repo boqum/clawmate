@@ -18,6 +18,48 @@ const Speech = (() => {
     mode = m;
   }
 
+  /**
+   * 캐릭터 위치(edge)에 따라 말풍선 좌표를 계산
+   * - bottom(바닥): 캐릭터 위에
+   * - left(왼쪽 벽): 캐릭터 오른쪽(머리 쪽)에
+   * - right(오른쪽 벽): 캐릭터 왼쪽(머리 쪽)에
+   * - top(천장): 캐릭터 아래에
+   * - 점프/낙하/레펠 중: 캐릭터 위에 (기본)
+   */
+  function getBubblePosition(pos) {
+    const edge = pos.edge;
+    const mode = pos.movementMode;
+
+    // 공중일 때는 항상 위에 표시
+    if (mode === 'jumping' || mode === 'falling' || mode === 'rappelling') {
+      return { left: pos.x - 30, top: pos.y - 60 };
+    }
+
+    switch (edge) {
+      case 'left':
+        return { left: pos.x + 70, top: pos.y - 10 };
+      case 'right':
+        return { left: pos.x - 150, top: pos.y - 10 };
+      case 'top':
+        return { left: pos.x - 30, top: pos.y + 70 };
+      case 'bottom':
+      default:
+        return { left: pos.x - 30, top: pos.y - 60 };
+    }
+  }
+
+  /**
+   * 말풍선이 화면 밖으로 나가지 않도록 좌표를 제한
+   */
+  function clampBubblePosition(left, top) {
+    const maxW = window.innerWidth - 200;  // 말풍선 대략 너비 고려
+    const maxH = window.innerHeight - 50;
+    return {
+      left: Math.max(5, Math.min(left, maxW)),
+      top: Math.max(5, Math.min(top, maxH)),
+    };
+  }
+
   function show(text) {
     hide(); // 기존 말풍선 제거
 
@@ -27,9 +69,11 @@ const Speech = (() => {
     const bubble = document.createElement('div');
     bubble.className = `speech-bubble speech-${mode}`;
 
-    // 말풍선 위치 (캐릭터 위)
-    bubble.style.left = (pos.x - 30) + 'px';
-    bubble.style.top = (pos.y - 60) + 'px';
+    // edge별 말풍선 위치 계산 + 화면 밖 방지 clamp
+    const rawPos = getBubblePosition(pos);
+    const clamped = clampBubblePosition(rawPos.left, rawPos.top);
+    bubble.style.left = clamped.left + 'px';
+    bubble.style.top = clamped.top + 'px';
 
     const textEl = document.createElement('span');
     textEl.className = 'speech-text';
@@ -72,8 +116,11 @@ const Speech = (() => {
   function updatePosition() {
     if (!currentBubble) return;
     const pos = PetEngine.getPosition();
-    currentBubble.style.left = (pos.x - 30) + 'px';
-    currentBubble.style.top = (pos.y - 60) + 'px';
+    // edge별 말풍선 위치 재계산 + 화면 밖 방지
+    const rawPos = getBubblePosition(pos);
+    const clamped = clampBubblePosition(rawPos.left, rawPos.top);
+    currentBubble.style.left = clamped.left + 'px';
+    currentBubble.style.top = clamped.top + 'px';
   }
 
   // --- 메시지 선택 헬퍼 ---

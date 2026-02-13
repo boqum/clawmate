@@ -30,10 +30,18 @@ let lastDesktopCheckTime = 0;
 let lastScreenCheckTime = 0;
 let lastGreetingDate = null;  // 하루에 한번만 인사
 
+// 공간 탐험 시스템 상태
+let knownWindows = [];         // 알고 있는 윈도우 목록
+let lastWindowCheckTime = 0;
+let homePosition = null;       // "집" 위치 (자주 가는 곳)
+let explorationHistory = [];   // 탐험한 위치 기록
+let lastExploreTime = 0;
+let lastFolderCarryTime = 0;
+
 module.exports = {
   id: 'clawmate',
   name: 'ClawMate',
-  version: '1.0.0',
+  version: '1.2.0',
   description: 'OpenClaw 데스크톱 펫 - AI가 조종하는 살아있는 Claw',
 
   /**
@@ -223,6 +231,11 @@ function setupConnectorEvents() {
     await handleUserEvent(event);
   });
 
+  // 윈도우 위치 정보 수신 → 탐험 시스템에서 활용
+  connector.on('window_positions', (data) => {
+    knownWindows = data.windows || [];
+  });
+
   connector.on('disconnected', () => {
     console.log('[ClawMate] 연결 끊김 — Think Loop 중단, 재연결 시도');
     stopThinkLoop();
@@ -241,6 +254,13 @@ function onConnected() {
   if (connector && connector.connected) {
     connector.speak('OpenClaw 연결됨! 같이 놀자!');
     connector.action('excited');
+
+    // "집" 위치 설정 — 화면 하단 왼쪽을 기본 홈으로
+    homePosition = { x: 100, y: 1000, edge: 'bottom' };
+
+    // 초기 윈도우 목록 조회
+    connector.queryWindows();
+
     startThinkLoop();
   }
 }
@@ -404,6 +424,12 @@ const IDLE_CHATTER = [
   '나한테 관심 좀 줘봐!',
   '데스크톱이 넓고 좋다~',
   '여기서 보이는 게 다 내 세상!',
+  // 공간 탐험 관련 멘트
+  '화면 위를 점프해볼까~!',
+  '천장에서 내려가보자!',
+  '이 창 위에 올라가봐야지~',
+  '여기가 내 집이야~ 편하다!',
+  '좀 돌아다녀볼까? 탐험 모드!',
 ];
 
 // 랜덤 행동 목록
@@ -414,6 +440,9 @@ const RANDOM_ACTIONS = [
   { action: 'climbing', weight: 8, minInterval: 20000 },
   { action: 'looking_around', weight: 20, minInterval: 8000 },
   { action: 'sleeping', weight: 7, minInterval: 60000 },
+  // 공간 이동 행동
+  { action: 'jumping', weight: 5, minInterval: 30000 },
+  { action: 'rappelling', weight: 3, minInterval: 45000 },
 ];
 
 /**
@@ -484,6 +513,15 @@ async function thinkCycle() {
 
   // --- 6) 화면 관찰 (2분 간격, 10% 확률) ---
   handleScreenObservation(now);
+
+  // --- 7) 공간 탐험 (20초 간격, 20% 확률) ---
+  handleExploration(now, state);
+
+  // --- 8) 윈도우 체크 (30초 간격) ---
+  handleWindowCheck(now);
+
+  // --- 9) 바탕화면 폴더 나르기 (3분 간격, 10% 확률) ---
+  handleFolderCarry(now);
 }
 
 /**
@@ -586,7 +624,21 @@ function handleRandomAction(now, hour, isNightMode, state) {
   // minInterval 체크
   if (now - lastActionTime < selected.minInterval) return;
 
-  connector.action(selected.action);
+  // 공간 이동 행동은 전용 API로 처리
+  if (selected.action === 'jumping') {
+    // 랜덤 위치로 점프 또는 화면 중앙으로
+    if (Math.random() > 0.5) {
+      connector.moveToCenter();
+    } else {
+      const randomX = Math.floor(Math.random() * 1200) + 100;
+      const randomY = Math.floor(Math.random() * 800) + 100;
+      connector.jumpTo(randomX, randomY);
+    }
+  } else if (selected.action === 'rappelling') {
+    connector.rappel();
+  } else {
+    connector.action(selected.action);
+  }
   lastActionTime = now;
 }
 
@@ -677,6 +729,130 @@ function weightedRandom(items) {
     if (random <= 0) return item;
   }
   return items[items.length - 1];
+}
+
+// =====================================================
+// 공간 탐험 시스템 — OpenClaw이 컴퓨터를 "집"처럼 돌아다님
+// =====================================================
+
+/**
+ * 공간 탐험 처리 (20초 간격, 20% 확률)
+ * 윈도우 위를 걸어다니고, 레펠로 내려가고, 집으로 돌아가는 등
+ */
+function handleExploration(now, state) {
+  const exploreInterval = 20000; // 20초
+  if (now - lastExploreTime < exploreInterval) return;
+
+  // 20% 확률
+  if (Math.random() > 0.2) return;
+  lastExploreTime = now;
+
+  // 가중치 기반 탐험 행동 선택
+  const actions = [
+    { type: 'jump_to_center', weight: 15, speech: '화면 중앙 탐험~!' },
+    { type: 'rappel_down', weight: 10, speech: '실 타고 내려가볼까~' },
+    { type: 'climb_wall', weight: 20 },
+    { type: 'visit_window', weight: 25, speech: '이 창 위에 올라가볼까?' },
+    { type: 'return_home', weight: 30, speech: '집에 가자~' },
+  ];
+
+  const selected = weightedRandom(actions);
+  if (!selected) return;
+
+  switch (selected.type) {
+    case 'jump_to_center':
+      connector.moveToCenter();
+      if (selected.speech) connector.speak(selected.speech);
+      break;
+
+    case 'rappel_down':
+      connector.rappel();
+      if (selected.speech) setTimeout(() => connector.speak(selected.speech), 500);
+      break;
+
+    case 'climb_wall':
+      connector.action('climbing_up');
+      break;
+
+    case 'visit_window':
+      // 알려진 윈도우 중 랜덤으로 하나 선택 후 타이틀바 위로 점프
+      if (knownWindows.length > 0) {
+        const win = knownWindows[Math.floor(Math.random() * knownWindows.length)];
+        connector.jumpTo(win.x + win.width / 2, win.y);
+        if (selected.speech) connector.speak(selected.speech);
+      }
+      break;
+
+    case 'return_home':
+      if (homePosition) {
+        connector.jumpTo(homePosition.x, homePosition.y);
+      } else {
+        connector.action('idle');
+      }
+      if (selected.speech) connector.speak(selected.speech);
+      break;
+  }
+
+  // 탐험 기록 저장 (최근 20개)
+  explorationHistory.push({ type: selected.type, time: now });
+  if (explorationHistory.length > 20) {
+    explorationHistory.shift();
+  }
+}
+
+/**
+ * 윈도우 위치 정보 주기적 갱신 (30초 간격)
+ * OS에서 열린 윈도우 목록을 가져와 탐험에 활용
+ */
+function handleWindowCheck(now) {
+  const windowCheckInterval = 30000; // 30초
+  if (now - lastWindowCheckTime < windowCheckInterval) return;
+  lastWindowCheckTime = now;
+  connector.queryWindows();
+}
+
+/**
+ * 바탕화면 폴더 나르기 (3분 간격, 10% 확률)
+ * 바탕화면 폴더를 하나 집어서 잠시 들고 다니다가 내려놓음
+ */
+function handleFolderCarry(now) {
+  const carryInterval = 3 * 60 * 1000; // 3분
+  if (now - lastFolderCarryTime < carryInterval) return;
+
+  // 10% 확률
+  if (Math.random() > 0.1) return;
+  lastFolderCarryTime = now;
+
+  try {
+    const desktopPath = path.join(os.homedir(), 'Desktop');
+    if (!fs.existsSync(desktopPath)) return;
+
+    const entries = fs.readdirSync(desktopPath, { withFileTypes: true });
+    // 폴더만 필터 (숨김 폴더 제외, 안전한 것만)
+    const folders = entries
+      .filter(e => e.isDirectory() && !e.name.startsWith('.'))
+      .map(e => e.name);
+
+    if (folders.length === 0) return;
+
+    const folder = folders[Math.floor(Math.random() * folders.length)];
+    connector.decide({
+      action: 'carrying',
+      speech: `${folder} 폴더 들고 다녀볼까~`,
+      emotion: 'playful',
+    });
+    connector.carryFile(folder);
+
+    // 5초 후 내려놓기
+    setTimeout(() => {
+      if (connector && connector.connected) {
+        connector.dropFile();
+        connector.speak('여기 놔둘게~');
+      }
+    }, 5000);
+  } catch {
+    // 바탕화면 폴더 접근 실패 — 무시
+  }
 }
 
 // =====================================================

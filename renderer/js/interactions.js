@@ -73,10 +73,31 @@ const Interactions = (() => {
     pet.classList.remove('dragging');
 
     const endPos = PetEngine.getPosition();
-    PetEngine.snapToNearestEdge();
-    StateMachine.forceState('idle');
-    PetEngine.start();
 
+    // 화면 가장자리까지의 거리 계산
+    const screenW = window.innerWidth;
+    const screenH = window.innerHeight;
+    const charSize = PetEngine.CHAR_SIZE;
+    const distBottom = screenH - charSize - endPos.y;
+    const distTop = endPos.y;
+    const distLeft = endPos.x;
+    const distRight = screenW - charSize - endPos.x;
+    const minEdgeDist = Math.min(distBottom, distTop, distLeft, distRight);
+
+    // 가장자리에서 충분히 떨어져 있으면 (화면 중앙 근처) → 낙하
+    // 가장자리 근처 임계값: 화면 짧은 변의 15%
+    const edgeThreshold = Math.min(screenW, screenH) * 0.15;
+
+    if (minEdgeDist > edgeThreshold) {
+      // 화면 중앙 근처: 중력 낙하로 바닥까지 떨어짐
+      PetEngine.startFalling();
+    } else {
+      // 가장자리 근처: 기존대로 가장 가까운 가장자리에 붙음
+      PetEngine.snapToNearestEdge();
+      StateMachine.forceState('idle');
+    }
+
+    PetEngine.start();
     window.clawmate.setClickThrough(true);
 
     // AI에 드래그 이벤트 리포트

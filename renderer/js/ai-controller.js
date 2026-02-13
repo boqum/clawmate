@@ -111,6 +111,35 @@ const AIController = (() => {
         // 종합 의사결정 — 여러 행동을 순서대로 실행
         executeDecision(payload);
         break;
+
+      // === 공간 이동 명령 ===
+
+      case 'jump_to':
+        // 특정 위치로 점프
+        // payload: { x, y }
+        PetEngine.jumpTo(payload.x, payload.y);
+        break;
+
+      case 'rappel':
+        // 레펠 시작 (천장/벽에서 실 타고 내려가기)
+        PetEngine.startRappel();
+        break;
+
+      case 'release_thread':
+        // 레펠 실 해제 (낙하)
+        PetEngine.releaseThread();
+        break;
+
+      case 'move_to_center':
+        // 화면 중앙으로 이동 (물리적 방법으로)
+        PetEngine.moveToCenter();
+        break;
+
+      case 'walk_on_window':
+        // 특정 윈도우 타이틀바 위로 이동
+        // payload: { windowId, x, y }
+        PetEngine.jumpTo(payload.x, payload.y);
+        break;
     }
   }
 
@@ -140,7 +169,16 @@ const AIController = (() => {
     }
 
     if (decision.moveTo) {
-      PetEngine.setPosition(decision.moveTo.x, decision.moveTo.y);
+      // 이동 방법에 따라 다른 물리 동작 사용
+      if (decision.moveTo.method === 'jump') {
+        PetEngine.jumpTo(decision.moveTo.x, decision.moveTo.y);
+      } else if (decision.moveTo.method === 'rappel') {
+        PetEngine.startRappel();
+      } else if (decision.moveTo.method === 'center') {
+        PetEngine.moveToCenter();
+      } else {
+        PetEngine.setPosition(decision.moveTo.x, decision.moveTo.y);
+      }
     }
   }
 

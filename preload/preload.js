@@ -26,6 +26,9 @@ contextBridge.exposeInMainWorld('clawmate', {
   // 창 정보
   getScreenSize: () => ipcRenderer.invoke('get-screen-size'),
 
+  // 열린 윈도우 위치/크기 조회
+  getWindowPositions: () => ipcRenderer.invoke('get-window-positions'),
+
   // 화면 캡처
   screen: {
     capture: () => ipcRenderer.invoke('capture-screen'),

@@ -39,6 +39,10 @@
 </head>
 <body>
   <div id="world">
+    <!-- 레펠 실(thread) 시각화용 SVG 레이어 -->
+    <svg id="thread-svg" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:999;">
+      <line id="thread-line" x1="0" y1="0" x2="0" y2="0" stroke="#888" stroke-width="1" style="display:none;" />
+    </svg>
     <div id="pet-container"></div>
     <div id="speech-container"></div>
   </div>

@@ -90,6 +90,11 @@ class OpenClawConnector extends EventEmitter {
         this.emit('screen_capture', payload);
         break;
 
+      case 'window_positions':
+        // 윈도우 위치 정보 응답 → 탐험 시스템에서 사용
+        this.emit('window_positions', payload);
+        break;
+
       case 'heartbeat':
         break;
     }
@@ -158,6 +163,38 @@ class OpenClawConnector extends EventEmitter {
    */
   decide(decision) {
     return this._send('ai_decision', decision);
+  }
+
+  // === 공간 이동 API (OpenClaw이 컴퓨터를 "집"처럼 돌아다님) ===
+
+  /** 특정 위치로 점프 */
+  jumpTo(x, y) {
+    return this._send('jump_to', { x, y });
+  }
+
+  /** 레펠 시작 (천장/벽에서 실 타고 내려감) */
+  rappel() {
+    return this._send('rappel', {});
+  }
+
+  /** 레펠 실 해제 (낙하) */
+  releaseThread() {
+    return this._send('release_thread', {});
+  }
+
+  /** 화면 중앙으로 이동 */
+  moveToCenter() {
+    return this._send('move_to_center', {});
+  }
+
+  /** 특정 윈도우 위로 점프 */
+  walkOnWindow(windowId, x, y) {
+    return this._send('walk_on_window', { windowId, x, y });
+  }
+
+  /** 열린 윈도우 목록 요청 */
+  queryWindows() {
+    return this._send('query_windows', {});
   }
 
   /**

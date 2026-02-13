@@ -332,6 +332,9 @@ const Character = (() => {
     interacting: 'excited',
     scared: 'scared',
     excited: 'excited',
+    jumping: 'excited',    // 점프: excited 프레임셋 재활용
+    rappelling: 'climb',   // 레펠: climb 프레임셋 재활용
+    falling: 'scared',     // 낙하: scared 프레임셋 재활용
   };
 
   let currentCanvas = null;
