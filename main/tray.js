@@ -8,37 +8,7 @@ const { isAutoStartEnabled, toggleAutoStart } = require('./autostart');
 let tray = null;
 let aiBridge = null;
 
-/**
- * Generate 16x16 Claw pixel art icon
- */
-const CLAW_ICON = [
-  [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-  [0,0,6,6,0,0,0,0,0,0,0,0,6,6,0,0],
-  [0,6,0,0,6,0,0,0,0,0,0,6,0,0,6,0],
-  [0,6,0,0,6,0,0,0,0,0,0,6,0,0,6,0],
-  [0,0,6,6,0,0,0,0,0,0,0,0,6,6,0,0],
-  [0,0,0,6,1,1,0,0,0,0,1,1,6,0,0,0],
-  [0,0,0,0,1,1,1,1,1,1,1,1,0,0,0,0],
-  [0,0,0,1,1,4,5,1,1,4,5,1,1,0,0,0],
-  [0,0,0,1,1,4,5,1,1,4,5,1,1,0,0,0],
-  [0,0,1,1,1,1,1,1,1,1,1,1,1,1,0,0],
-  [0,0,1,2,1,1,1,1,1,1,1,1,2,1,0,0],
-  [0,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0],
-  [0,0,0,0,1,1,1,1,1,1,1,1,0,0,0,0],
-  [0,0,3,3,3,0,3,3,3,3,0,3,3,3,0,0],
-  [0,3,3,3,0,0,0,3,3,0,0,0,3,3,3,0],
-  [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-];
-
-const COLOR_MAP = {
-  0: [0, 0, 0, 0],
-  1: [255, 79, 64, 255],
-  2: [255, 119, 95, 255],
-  3: [58, 10, 13, 255],
-  4: [255, 255, 255, 255],
-  5: [0, 0, 0, 255],
-  6: [255, 79, 64, 255],
-};
+// (icon generated programmatically in createClawIcon)
 
 /**
  * Character preset list
@@ -87,21 +57,66 @@ const CHARACTER_PRESETS = {
   },
 };
 
+/**
+ * Generate 32x32 claw-marks tray icon
+ * Three diagonal scratch marks in ClawMate brand red
+ */
 function createClawIcon() {
-  const size = 16;
-  const buffer = Buffer.alloc(size * size * 4);
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const code = CLAW_ICON[y][x];
-      const color = COLOR_MAP[code] || COLOR_MAP[0];
-      const offset = (y * size + x) * 4;
-      buffer[offset + 0] = color[0];
-      buffer[offset + 1] = color[1];
-      buffer[offset + 2] = color[2];
-      buffer[offset + 3] = color[3];
+  const size = 32;
+  const buf = Buffer.alloc(size * size * 4, 0);
+
+  function setPixel(x, y, r, g, b, a) {
+    if (x < 0 || x >= size || y < 0 || y >= size) return;
+    const off = (y * size + x) * 4;
+    const srcA = a / 255;
+    const dstA = buf[off + 3] / 255;
+    const outA = srcA + dstA * (1 - srcA);
+    if (outA <= 0) return;
+    buf[off] = Math.round((r * srcA + buf[off] * dstA * (1 - srcA)) / outA);
+    buf[off + 1] = Math.round((g * srcA + buf[off + 1] * dstA * (1 - srcA)) / outA);
+    buf[off + 2] = Math.round((b * srcA + buf[off + 2] * dstA * (1 - srcA)) / outA);
+    buf[off + 3] = Math.round(outA * 255);
+  }
+
+  // Draw a tapered anti-aliased scratch line
+  function drawScratch(x0, y0, x1, y1, maxW) {
+    const dx = x1 - x0, dy = y1 - y0;
+    const len = Math.sqrt(dx * dx + dy * dy);
+    const nx = -dy / len, ny = dx / len;
+    const steps = Math.ceil(len * 3);
+
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      const cx = x0 + dx * t;
+      const cy = y0 + dy * t;
+
+      // Taper: thin at ends, wide in middle
+      const w = maxW * (0.3 + 0.7 * Math.pow(Math.sin(t * Math.PI), 0.6));
+
+      // Color: dark red at base → bright red at tip
+      const r = Math.round(180 + 75 * t);
+      const g = Math.round(30 + 49 * t);
+      const b = Math.round(20 + 44 * t);
+
+      for (let d = -Math.ceil(w + 1); d <= Math.ceil(w + 1); d++) {
+        const dist = Math.abs(d);
+        if (dist > w + 0.5) continue;
+        const px = Math.round(cx + nx * d);
+        const py = Math.round(cy + ny * d);
+        const alpha = dist > w - 0.5
+          ? Math.round(Math.max(0, (w + 0.5 - dist) * 255))
+          : 255;
+        setPixel(px, py, r, g, b, alpha);
+      }
     }
   }
-  return nativeImage.createFromBuffer(buffer, { width: size, height: size });
+
+  // Three claw scratches: bottom-left → top-right
+  drawScratch(4, 28, 10, 3, 2.5);
+  drawScratch(13, 28, 19, 3, 2.8);
+  drawScratch(22, 28, 28, 3, 2.5);
+
+  return nativeImage.createFromBuffer(buf, { width: size, height: size });
 }
 
 function setupTray(mainWindow, bridge, getProactiveMonitor) {
