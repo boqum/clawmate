@@ -48,7 +48,7 @@
 
       <div class="mode-card" id="mode-incarnation" onclick="selectMode('incarnation')">
         <div class="mode-icon">\u{1F980}</div>
-        <h2>OpenClaw</h2>
+        <h2>Claw</h2>
         <p>육체를 얻은 존재</p>
         <span class="mode-desc">침착하고 카리스마 있는 Claw!</span>
       </div>
@@ -72,7 +72,7 @@
       document.getElementById('mode-' + mode).classList.add('selected');
       const btn = document.getElementById('start-btn');
       btn.disabled = false;
-      btn.textContent = mode === 'pet' ? 'Clawby와 시작!' : 'OpenClaw과 시작!';
+      btn.textContent = mode === 'pet' ? 'Clawby와 시작!' : 'Claw과 시작!';
     }
 
     async function startFirstRun() {

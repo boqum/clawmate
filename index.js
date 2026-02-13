@@ -1,10 +1,10 @@
 /**
- * ClawMate — OpenClaw 플러그인 진입점
+ * ClawMate 플러그인 진입점
  *
- * 핵심 원칙: OpenClaw이 켜지면 자동으로 ClawMate를 찾아서 연결.
+ * 핵심 원칙: AI가 연결되면 자동으로 ClawMate를 찾아서 연결.
  *
  * 흐름:
- *   OpenClaw 시작 → 플러그인 로드 → init() 자동 호출
+ *   플러그인 로드 → init() 자동 호출
  *     → ClawMate 실행 중인지 확인 (ws://127.0.0.1:9320 연결 시도)
  *       → 실행 중이면: 바로 연결, AI 뇌 역할 시작
  *       → 안 돌고 있으면: Electron 앱 자동 실행 → 연결
@@ -14,7 +14,7 @@ const { spawn } = require('child_process');
 const path = require('path');
 const os = require('os');
 const fs = require('fs');
-const { OpenClawConnector } = require('./main/ai-connector');
+const { ClawMateConnector } = require('./main/ai-connector');
 
 let connector = null;
 let electronProcess = null;
@@ -61,14 +61,18 @@ let behaviorAdjustments = {        // 현재 적용 중인 행동 조정값
 };
 let lastMetricsLogTime = 0;        // 마지막 품질 보고서 로그 시각
 
+// AI 모션 생성 시스템 상태
+let lastMotionGenTime = 0;         // 마지막 모션 생성 시각
+let generatedMotionCount = 0;      // 생성된 모션 수
+
 module.exports = {
   id: 'clawmate',
   name: 'ClawMate',
-  version: '1.3.0',
-  description: 'OpenClaw 데스크톱 펫 - AI가 조종하는 살아있는 Claw',
+  version: '1.4.0',
+  description: 'ClawMate 데스크톱 펫 - AI가 조종하는 살아있는 펫',
 
   /**
-   * OpenClaw이 플러그인을 로드할 때 자동 호출
+   * 플러그인 로드 시 자동 호출
    * → ClawMate 자동 실행 + 자동 연결
    */
   async init(api) {
@@ -170,7 +174,7 @@ module.exports = {
   },
 
   /**
-   * OpenClaw 종료 시 정리
+   * 플러그인 종료 시 정리
    */
   async destroy() {
     console.log('[ClawMate] 플러그인 정리');
@@ -188,7 +192,7 @@ module.exports = {
 // =====================================================
 
 /**
- * OpenClaw 시작 시 자동으로 ClawMate 찾기/실행/연결
+ * 플러그인 시작 시 자동으로 ClawMate 찾기/실행/연결
  * 무한 재시도 — ClawMate가 살아있는 한 항상 연결 유지
  */
 async function autoConnect() {
@@ -214,7 +218,7 @@ async function autoConnect() {
 function tryConnect() {
   return new Promise((resolve) => {
     if (!connector) {
-      connector = new OpenClawConnector(9320);
+      connector = new ClawMateConnector(9320);
       setupConnectorEvents();
     }
 
@@ -308,7 +312,7 @@ function setupConnectorEvents() {
  */
 function onConnected() {
   if (connector && connector.connected) {
-    connector.speak('OpenClaw 연결됨! 같이 놀자!');
+    connector.speak('AI 연결됨! 같이 놀자!');
     connector.action('excited');
 
     // "집" 위치 설정 — 화면 하단 왼쪽을 기본 홈으로
@@ -385,6 +389,14 @@ async function handleUserEvent(event) {
       if (event.distance < 50) {
         connector.decide({ action: 'excited', emotion: 'happy' });
       }
+      break;
+
+    case 'double_click':
+      connector.decide({
+        action: 'excited',
+        speech: '우와! 더블클릭이다! 기분 좋아~',
+        emotion: 'happy',
+      });
       break;
 
     case 'drag':
@@ -1076,6 +1088,9 @@ async function thinkCycle() {
 
   // --- 9) 바탕화면 폴더 나르기 (3분 간격, 10% 확률) ---
   handleFolderCarry(now);
+
+  // --- 10) AI 모션 생성 (2분 간격, 15% 확률) ---
+  handleMotionGeneration(now, state);
 }
 
 /**
@@ -1253,7 +1268,7 @@ function handleDesktopCheck(now) {
 
 /**
  * 화면 관찰 (2분 간격, 10% 확률)
- * 스크린샷을 캡처해서 OpenClaw AI가 화면 내용을 인식
+ * 스크린샷을 캡처해서 AI가 화면 내용을 인식
  */
 function handleScreenObservation(now) {
   const screenCheckInterval = 2 * 60 * 1000; // 2분
@@ -1286,7 +1301,7 @@ function weightedRandom(items) {
 }
 
 // =====================================================
-// 공간 탐험 시스템 — OpenClaw이 컴퓨터를 "집"처럼 돌아다님
+// 공간 탐험 시스템 — 펫이 컴퓨터를 "집"처럼 돌아다님
 // =====================================================
 
 /**
@@ -1408,6 +1423,175 @@ function handleFolderCarry(now) {
   } catch {
     // 바탕화면 폴더 접근 실패 — 무시
   }
+}
+
+// =====================================================
+// AI 모션 생성 시스템 — 키프레임 기반 움직임을 동적 생성
+// =====================================================
+
+/**
+ * AI 모션 생성 처리 (2분 간격, 15% 확률)
+ * 상황에 맞는 커스텀 이동 패턴을 AI가 직접 생성하여 등록+실행
+ *
+ * 생성 전략:
+ * 1차: apiRef.generate()로 완전한 키프레임 데이터 생성
+ * 2차: 상태 기반 프로시저럴 모션 생성 (폴백)
+ */
+async function handleMotionGeneration(now, state) {
+  const motionGenInterval = 2 * 60 * 1000; // 2분
+  if (now - lastMotionGenTime < motionGenInterval) return;
+  if (Math.random() > 0.15) return; // 15% 확률
+  lastMotionGenTime = now;
+
+  const currentState = state?.action || state?.state || 'idle';
+
+  // AI로 모션 생성 시도
+  let motionDef = null;
+  if (apiRef?.generate) {
+    try {
+      motionDef = await generateMotionWithAI(currentState);
+    } catch {}
+  }
+
+  // 폴백: 프로시저럴 모션 생성
+  if (!motionDef) {
+    motionDef = generateProceduralMotion(currentState, now);
+  }
+
+  if (motionDef && connector?.connected) {
+    const motionName = `ai_motion_${generatedMotionCount++}`;
+    connector.registerMovement(motionName, motionDef);
+
+    // 잠시 후 실행
+    setTimeout(() => {
+      if (connector?.connected) {
+        connector.customMove(motionName, {});
+        console.log(`[ClawMate] AI 모션 생성 실행: ${motionName}`);
+      }
+    }, 500);
+  }
+}
+
+/**
+ * AI로 키프레임 모션 생성
+ * 수학 공식(formula) 또는 웨이포인트(waypoints) 방식의 모션 정의를 생성
+ */
+async function generateMotionWithAI(currentState) {
+  const prompt = `현재 펫 상태: ${currentState}.
+이 상황에 어울리는 재미있는 이동 패턴을 JSON으로 만들어줘.
+
+두 가지 형식 중 하나를 선택:
+1) formula 방식 (수학적 궤도):
+{"type":"formula","formula":{"xAmp":80,"yAmp":40,"xFreq":1,"yFreq":2,"xPhase":0,"yPhase":0},"duration":3000,"speed":1.5}
+
+2) waypoints 방식 (경로점):
+{"type":"waypoints","waypoints":[{"x":100,"y":200,"pause":300},{"x":300,"y":100},{"x":500,"y":250}],"speed":2}
+
+규칙:
+- xAmp/yAmp: 10~150 사이 (화면 크기 고려)
+- duration: 2000~6000ms
+- waypoints: 3~6개
+- speed: 0.5~3
+- 펫 성격에 맞게: 장난스럽고 귀여운 움직임
+JSON만 출력해.`;
+
+  const response = await apiRef.generate(prompt);
+  if (!response || typeof response !== 'string') return null;
+
+  // JSON 파싱
+  let jsonStr = response;
+  const jsonMatch = response.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (jsonMatch) jsonStr = jsonMatch[1].trim();
+  else {
+    const braceMatch = response.match(/\{[\s\S]*\}/);
+    if (braceMatch) jsonStr = braceMatch[0];
+  }
+
+  try {
+    const def = JSON.parse(jsonStr);
+    // 기본 검증
+    if (def.type === 'formula' && def.formula) {
+      def.duration = Math.min(6000, Math.max(2000, def.duration || 3000));
+      return def;
+    }
+    if (def.type === 'waypoints' && Array.isArray(def.waypoints) && def.waypoints.length >= 2) {
+      return def;
+    }
+  } catch {}
+  return null;
+}
+
+/**
+ * 프로시저럴 모션 생성 (AI 없을 때 폴백)
+ * 현재 상태와 시간에 따라 수학적으로 모션 패턴 생성
+ */
+function generateProceduralMotion(currentState, now) {
+  const hour = new Date(now).getHours();
+  const seed = now % 1000;
+
+  // 상태별 모션 특성
+  const stateMotions = {
+    idle: () => {
+      // 가벼운 좌우 흔들림 또는 작은 원
+      if (seed > 500) {
+        return {
+          type: 'formula',
+          formula: { xAmp: 20 + seed % 30, yAmp: 5 + seed % 10, xFreq: 0.5, yFreq: 1, xPhase: 0, yPhase: Math.PI / 2 },
+          duration: 3000,
+          speed: 0.8,
+        };
+      }
+      return {
+        type: 'formula',
+        formula: { xAmp: 15, yAmp: 15, xFreq: 1, yFreq: 1, xPhase: 0, yPhase: Math.PI / 2 },
+        duration: 2500,
+        speed: 0.6,
+      };
+    },
+    walking: () => {
+      // 지그재그 또는 사인파 이동
+      const amp = 30 + seed % 50;
+      return {
+        type: 'formula',
+        formula: { xAmp: amp, yAmp: amp * 0.3, xFreq: 0.5, yFreq: 2, xPhase: 0, yPhase: 0 },
+        duration: 4000,
+        speed: 1.2,
+      };
+    },
+    excited: () => {
+      // 활발한 8자 궤도
+      return {
+        type: 'formula',
+        formula: { xAmp: 80 + seed % 40, yAmp: 40 + seed % 20, xFreq: 1, yFreq: 2, xPhase: 0, yPhase: 0 },
+        duration: 3000,
+        speed: 2.0,
+      };
+    },
+    playing: () => {
+      // 불규칙한 웨이포인트 (놀기 느낌)
+      const points = [];
+      for (let i = 0; i < 4; i++) {
+        points.push({
+          x: 100 + Math.floor(Math.random() * 800),
+          y: 100 + Math.floor(Math.random() * 400),
+          pause: i === 0 ? 200 : 0,
+        });
+      }
+      return { type: 'waypoints', waypoints: points, speed: 2.5 };
+    },
+  };
+
+  // 야간에는 느린 모션
+  const isNight = hour >= 23 || hour < 6;
+  const generator = stateMotions[currentState] || stateMotions.idle;
+  const motion = generator();
+
+  if (isNight) {
+    motion.speed = Math.min(0.5, (motion.speed || 1) * 0.4);
+    if (motion.duration) motion.duration *= 1.5;
+  }
+
+  return motion;
 }
 
 // =====================================================
@@ -1586,7 +1770,7 @@ function adjustBehavior(metrics) {
 
 /**
  * 품질 보고서 콘솔 출력 (5분마다)
- * OpenClaw 개발자/운영자가 펫의 동작 품질을 모니터링할 수 있도록 한다.
+ * 개발자/운영자가 펫의 동작 품질을 모니터링할 수 있도록 한다.
  */
 function _logQualityReport(metrics) {
   const adj = behaviorAdjustments;

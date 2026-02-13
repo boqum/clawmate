@@ -1,14 +1,14 @@
 /**
- * OpenClaw ↔ ClawMate AI 브릿지
+ * AI ↔ ClawMate 브릿지
  *
- * OpenClaw 에이전트가 ClawMate의 뇌 역할을 한다.
- * - OpenClaw → ClawMate: 행동 명령, 말풍선, 감정, 이동
- * - ClawMate → OpenClaw: 사용자 이벤트 (클릭, 드래그, 커서, 파일 변화)
+ * AI 에이전트가 ClawMate의 뇌 역할을 한다.
+ * - AI → ClawMate: 행동 명령, 말풍선, 감정, 이동
+ * - ClawMate → AI: 사용자 이벤트 (클릭, 드래그, 커서, 파일 변화)
  *
  * 통신: WebSocket (로컬 ws://localhost:9320)
  * 프로토콜: JSON 메시지
  *
- * OpenClaw 연결 안 됐을 때 → 자율 모드 (기존 FSM) 로 폴백
+ * AI 연결 안 됐을 때 → 자율 모드 (기존 FSM) 로 폴백
  */
 const WebSocket = require('ws');
 const EventEmitter = require('events');
@@ -17,7 +17,7 @@ class AIBridge extends EventEmitter {
   constructor() {
     super();
     this.wss = null;
-    this.client = null;           // 연결된 OpenClaw 에이전트
+    this.client = null;           // 연결된 AI 에이전트
     this.connected = false;
     this.port = 9320;
     this.heartbeatInterval = null;
@@ -33,19 +33,19 @@ class AIBridge extends EventEmitter {
   }
 
   /**
-   * WebSocket 서버 시작 — OpenClaw이 여기에 접속
+   * WebSocket 서버 시작 — AI 에이전트가 여기에 접속
    */
   start() {
     this.wss = new WebSocket.Server({ port: this.port, host: '127.0.0.1' });
 
     this.wss.on('connection', (ws) => {
-      console.log('[AI Bridge] OpenClaw 연결됨');
+      console.log('[AI Bridge] AI 연결됨');
       this.client = ws;
       this.connected = true;
       this.reconnectAttempts = 0;
       this.emit('connected');
 
-      // OpenClaw에 현재 상태 전송
+      // AI에 현재 상태 전송
       this.send('sync', this.petState);
 
       ws.on('message', (data) => {
@@ -58,7 +58,7 @@ class AIBridge extends EventEmitter {
       });
 
       ws.on('close', () => {
-        console.log('[AI Bridge] OpenClaw 연결 해제');
+        console.log('[AI Bridge] AI 연결 해제');
         this.client = null;
         this.connected = false;
         this.emit('disconnected');
@@ -84,7 +84,7 @@ class AIBridge extends EventEmitter {
   }
 
   /**
-   * OpenClaw에서 온 명령 처리
+   * AI에서 온 명령 처리
    */
   _handleCommand(msg) {
     const { type, payload } = msg;
@@ -92,7 +92,7 @@ class AIBridge extends EventEmitter {
     switch (type) {
       // === 행동 제어 ===
       case 'action':
-        // OpenClaw이 펫의 행동을 직접 지시
+        // AI가 펫의 행동을 직접 지시
         // payload: { state: 'walking'|'excited'|..., duration?: ms }
         this.emit('action', payload);
         break;
@@ -111,7 +111,7 @@ class AIBridge extends EventEmitter {
 
       // === 말하기 ===
       case 'speak':
-        // OpenClaw이 펫을 통해 사용자에게 말함
+        // AI가 펫을 통해 사용자에게 말함
         // payload: { text: string, style?: 'normal'|'thought'|'shout' }
         this.emit('speak', payload);
         break;
@@ -196,7 +196,7 @@ class AIBridge extends EventEmitter {
 
       // === 커스텀 이동 패턴 ===
       case 'register_movement':
-        // OpenClaw이 커스텀 이동 패턴 등록
+        // AI가 커스텀 이동 패턴 등록
         // payload: { name: string, definition: { type: 'waypoints'|'formula'|'sequence', ... } }
         this.emit('register_movement', payload);
         break;
@@ -231,6 +231,12 @@ class AIBridge extends EventEmitter {
         this.emit('reset_character', payload);
         break;
 
+      case 'set_persona':
+        // 봇 인격체 전환 (Incarnation 모드)
+        // payload: { name, personality, speakingStyle, color?, ... }
+        this.emit('set_persona', payload);
+        break;
+
       // === 컨텍스트 질의 ===
       case 'query_state':
         // 현재 펫 상태 요청
@@ -244,7 +250,7 @@ class AIBridge extends EventEmitter {
 
       // === AI 의사결정 결과 ===
       case 'ai_decision':
-        // OpenClaw AI의 종합적 의사결정
+        // AI의 종합적 의사결정
         // payload: { action, speech?, emotion?, reasoning? }
         this.emit('ai_decision', payload);
         break;
@@ -255,7 +261,7 @@ class AIBridge extends EventEmitter {
   }
 
   /**
-   * OpenClaw에 이벤트 전송
+   * AI에 이벤트 전송
    */
   send(type, payload) {
     if (!this.client || this.client.readyState !== WebSocket.OPEN) return false;
@@ -267,7 +273,7 @@ class AIBridge extends EventEmitter {
     }
   }
 
-  // === 사용자 이벤트 리포트 (ClawMate → OpenClaw) ===
+  // === 사용자 이벤트 리포트 (ClawMate → AI) ===
 
   reportUserClick(position) {
     this.send('user_event', {
@@ -329,7 +335,7 @@ class AIBridge extends EventEmitter {
   }
 
   /**
-   * 메트릭 데이터를 OpenClaw에 전송
+   * 메트릭 데이터를 AI에 전송
    * 렌더러에서 수집한 펫 동작 품질 메트릭을 AI에 전달
    */
   reportMetrics(summary) {

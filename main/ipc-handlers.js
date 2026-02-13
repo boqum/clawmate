@@ -93,9 +93,9 @@ function registerIpcHandlers(getMainWindow, getAIBridge) {
     }
   });
 
-  // === OpenClaw AI 통신 ===
+  // === AI 통신 ===
 
-  // 사용자 이벤트를 AI Bridge로 전달 (렌더러 → main → OpenClaw)
+  // 사용자 이벤트를 AI Bridge로 전달 (렌더러 → main → AI)
   ipcMain.on('report-to-ai', (_, event, data) => {
     const bridge = getAIBridge();
     if (bridge && bridge.isConnected()) {
@@ -108,6 +108,9 @@ function registerIpcHandlers(getMainWindow, getAIBridge) {
           break;
         case 'cursor_near':
           bridge.reportCursorNear(data.distance, data.cursorPos);
+          break;
+        case 'double_click':
+          bridge.send('user_event', { event: 'double_click', ...data });
           break;
         case 'desktop_changed':
           bridge.reportDesktopChange(data.files);
@@ -139,7 +142,7 @@ function registerIpcHandlers(getMainWindow, getAIBridge) {
     return bridge ? bridge.isConnected() : false;
   });
 
-  // 메트릭 보고 (렌더러 → main → OpenClaw)
+  // 메트릭 보고 (렌더러 → main → AI)
   ipcMain.on('report-metrics', (_, summary) => {
     const bridge = getAIBridge();
     if (bridge && bridge.isConnected()) {

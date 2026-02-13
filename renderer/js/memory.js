@@ -14,7 +14,21 @@ const Memory = (() => {
     milestones: [],
     evolutionStage: 0,
     interactionStreak: 0,    // 연속 방문 일수
+
+    // --- 모션 히스토리 ---
+    motionHistory: [],       // 최근 100개 상태 전환 기록 [{state, timestamp, duration}]
+    motionStats: {},         // 상태별 누적 시간 {idle: 12345, walking: 6789, ...}
+
+    // --- 유저 반응 저장 ---
+    reactionLog: [],         // 최근 50개 유저 반응 [{action, reaction, timestamp}]
+    favoriteActions: {},     // 행동별 긍정 반응 횟수 {excited: 5, walking: 2, ...}
+    dislikedActions: {},     // 행동별 부정 반응 횟수 (무시/이탈)
   };
+
+  let lastMotionState = null;
+  let lastMotionTime = 0;
+  const MAX_MOTION_HISTORY = 100;
+  const MAX_REACTION_LOG = 50;
 
   let evolutionStages = null;
 
@@ -304,6 +318,95 @@ const Memory = (() => {
     container.appendChild(acc);
   }
 
+  // --- 모션 히스토리 기록 ---
+
+  /**
+   * 상태 전환 기록
+   * StateMachine에서 상태 변경 시 호출
+   */
+  function recordMotion(newState) {
+    const now = Date.now();
+
+    // 이전 상태의 지속 시간 계산 → 통계 누적
+    if (lastMotionState && lastMotionTime > 0) {
+      const duration = now - lastMotionTime;
+      if (!data.motionStats[lastMotionState]) data.motionStats[lastMotionState] = 0;
+      data.motionStats[lastMotionState] += duration;
+    }
+
+    // 히스토리에 추가
+    data.motionHistory.push({
+      state: newState,
+      timestamp: now,
+      from: lastMotionState || 'init',
+    });
+
+    // 최대 크기 초과 시 오래된 것 제거
+    if (data.motionHistory.length > MAX_MOTION_HISTORY) {
+      data.motionHistory = data.motionHistory.slice(-MAX_MOTION_HISTORY);
+    }
+
+    lastMotionState = newState;
+    lastMotionTime = now;
+
+    // 10회 전환마다 자동 저장
+    if (data.motionHistory.length % 10 === 0) save();
+  }
+
+  /**
+   * 유저 반응 기록
+   * 특정 행동 중 사용자가 클릭/드래그 등의 반응을 보인 경우
+   *
+   * @param {string} action - 펫이 하고 있던 행동
+   * @param {string} reaction - 'click' | 'drag' | 'cursor_near' | 'triple_click' | 'double_click'
+   */
+  function recordReaction(action, reaction) {
+    const now = Date.now();
+
+    // 반응 로그 추가
+    data.reactionLog.push({ action, reaction, timestamp: now });
+    if (data.reactionLog.length > MAX_REACTION_LOG) {
+      data.reactionLog = data.reactionLog.slice(-MAX_REACTION_LOG);
+    }
+
+    // 클릭/더블클릭은 긍정 반응으로 분류
+    if (reaction === 'click' || reaction === 'double_click' || reaction === 'cursor_near') {
+      if (!data.favoriteActions[action]) data.favoriteActions[action] = 0;
+      data.favoriteActions[action]++;
+    }
+    // 드래그(잡아서 옮김)는 약간 부정 반응
+    if (reaction === 'drag') {
+      if (!data.dislikedActions[action]) data.dislikedActions[action] = 0;
+      data.dislikedActions[action]++;
+    }
+
+    save();
+  }
+
+  /**
+   * 사용자 선호 행동 Top N 반환
+   * AI가 행동 결정 시 참고
+   */
+  function getFavoriteActions(topN = 5) {
+    const entries = Object.entries(data.favoriteActions || {});
+    entries.sort((a, b) => b[1] - a[1]);
+    return entries.slice(0, topN).map(([action, count]) => ({ action, count }));
+  }
+
+  /**
+   * 최근 모션 히스토리 반환
+   */
+  function getMotionHistory(limit = 20) {
+    return (data.motionHistory || []).slice(-limit);
+  }
+
+  /**
+   * 상태별 누적 시간 반환
+   */
+  function getMotionStats() {
+    return { ...(data.motionStats || {}) };
+  }
+
   async function save() {
     try {
       await window.clawmate.saveMemory(data);
@@ -318,5 +421,9 @@ const Memory = (() => {
     return data.evolutionStage;
   }
 
-  return { init, recordClick, getData, getEvolutionStage, save };
+  return {
+    init, recordClick, getData, getEvolutionStage, save,
+    recordMotion, recordReaction, getFavoriteActions,
+    getMotionHistory, getMotionStats,
+  };
 })();

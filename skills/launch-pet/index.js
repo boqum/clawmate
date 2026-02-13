@@ -48,7 +48,7 @@ module.exports = {
       child.unref();
 
       const mode = context.params?.mode || 'pet';
-      const modeName = mode === 'pet' ? 'Clawby' : 'OpenClaw';
+      const modeName = mode === 'pet' ? 'Clawby' : 'Claw';
 
       return {
         success: true,

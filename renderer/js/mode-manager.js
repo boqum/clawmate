@@ -22,14 +22,32 @@ const ModeManager = (() => {
     const p = personalities[mode];
     if (!p) return;
 
+    // Incarnation 모드: 활성 인격체가 있으면 반영
+    const persona = (mode === 'incarnation' && window._persona)
+      ? window._persona.getActivePersona()
+      : null;
+
     // 캐릭터 색상 업데이트
-    const colors = mode === 'pet'
-      ? { primary: '#ff4f40', secondary: '#ff775f', dark: '#8B4513', eye: '#ffffff', pupil: '#111111', claw: '#ff4f40' }
-      : { primary: '#ff4f40', secondary: '#ff775f', dark: '#8B4513', eye: '#00BFA5', pupil: '#004D40', claw: '#ff4f40' };
+    let colors;
+    if (mode === 'pet') {
+      colors = { primary: '#ff4f40', secondary: '#ff775f', dark: '#8B4513', eye: '#ffffff', pupil: '#111111', claw: '#ff4f40' };
+    } else if (persona?.color) {
+      // 인격체 커스텀 색상
+      colors = {
+        primary: persona.color.primary || '#ff4f40',
+        secondary: persona.color.secondary || '#ff775f',
+        dark: persona.color.dark || '#8B4513',
+        eye: persona.color.eye || '#00BFA5',
+        pupil: persona.color.pupil || '#004D40',
+        claw: persona.color.claw || '#ff4f40',
+      };
+    } else {
+      colors = { primary: '#ff4f40', secondary: '#ff775f', dark: '#8B4513', eye: '#00BFA5', pupil: '#004D40', claw: '#ff4f40' };
+    }
     Character.setColorMap(colors);
 
-    // 속도 조정
-    PetEngine.setSpeedMultiplier(p.speedMultiplier);
+    // 속도 조정 (인격체 우선)
+    PetEngine.setSpeedMultiplier(persona?.speedMultiplier ?? p.speedMultiplier);
 
     // CSS 클래스
     pet.classList.remove('mode-pet', 'mode-incarnation');
@@ -38,8 +56,34 @@ const ModeManager = (() => {
     // 말풍선 스타일
     Speech.setMode(mode);
 
-    // 성격 적용
-    StateMachine.setPersonality(p);
+    // 성격 적용 (인격체가 있으면 병합)
+    if (persona) {
+      StateMachine.setPersonality({
+        ...p,
+        playfulness: persona.playfulness ?? p.playfulness,
+        shyness: persona.shyness ?? p.shyness,
+        boldness: persona.boldness ?? p.boldness,
+      });
+    } else {
+      StateMachine.setPersonality(p);
+    }
+  }
+
+  /**
+   * 인격체 변경 (Incarnation 모드에서 봇 전환 시)
+   */
+  function setPersona(personaData) {
+    if (window._persona) {
+      window._persona.setActivePersona(personaData);
+      // 현재 Incarnation 모드면 즉시 반영
+      if (currentMode === 'incarnation') {
+        applyMode('incarnation');
+      }
+    }
+  }
+
+  function getPersona() {
+    return window._persona ? window._persona.getActivePersona() : null;
   }
 
   async function toggle() {
@@ -50,7 +94,7 @@ const ModeManager = (() => {
     spawnTransitionEffect(newMode);
     Speech.show(newMode === 'pet'
       ? 'Clawby 모드로 변신!'
-      : 'OpenClaw... 각성했다.');
+      : 'Claw... 각성했다.');
   }
 
   function spawnTransitionEffect(mode) {
@@ -78,5 +122,5 @@ const ModeManager = (() => {
     return currentMode;
   }
 
-  return { init, toggle, getMode, applyMode };
+  return { init, toggle, getMode, applyMode, setPersona, getPersona };
 })();

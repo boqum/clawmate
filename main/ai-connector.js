@@ -1,11 +1,11 @@
 /**
- * OpenClaw 에이전트 측 커넥터
+ * AI 에이전트 측 커넥터
  *
- * OpenClaw이 ClawMate에 접속해서 펫을 조종하는 클라이언트.
- * OpenClaw 플러그인(index.js)에서 사용됨.
+ * AI가 ClawMate에 접속해서 펫을 조종하는 클라이언트.
+ * ClawMate 플러그인(index.js)에서 사용됨.
  *
  * 사용 예:
- *   const connector = new OpenClawConnector();
+ *   const connector = new ClawMateConnector();
  *   await connector.connect();
  *   connector.speak('안녕! 오늘 뭐 할 거야?');
  *   connector.action('excited');
@@ -14,7 +14,7 @@
 const WebSocket = require('ws');
 const EventEmitter = require('events');
 
-class OpenClawConnector extends EventEmitter {
+class ClawMateConnector extends EventEmitter {
   constructor(port = 9320) {
     super();
     this.port = port;
@@ -81,12 +81,12 @@ class OpenClawConnector extends EventEmitter {
         break;
 
       case 'user_event':
-        // 사용자 이벤트 → OpenClaw AI가 반응 결정
+        // 사용자 이벤트 → AI가 반응 결정
         this.emit('user_event', payload);
         break;
 
       case 'screen_capture':
-        // 화면 캡처 응답 → OpenClaw AI가 분석
+        // 화면 캡처 응답 → AI가 분석
         this.emit('screen_capture', payload);
         break;
 
@@ -96,7 +96,7 @@ class OpenClawConnector extends EventEmitter {
         break;
 
       case 'metrics_report':
-        // 메트릭 데이터 수신 → OpenClaw AI가 분석
+        // 메트릭 데이터 수신 → AI가 분석
         this.emit('metrics_report', payload);
         break;
 
@@ -115,7 +115,7 @@ class OpenClawConnector extends EventEmitter {
     }
   }
 
-  // === OpenClaw → ClawMate 명령 API ===
+  // === AI → ClawMate 명령 API ===
 
   /** 펫이 말하게 함 */
   speak(text, style = 'normal') {
@@ -164,13 +164,13 @@ class OpenClawConnector extends EventEmitter {
 
   /**
    * AI 종합 의사결정 전송
-   * OpenClaw AI가 상황을 분석하고 내린 결정을 한번에 전송
+   * AI가 상황을 분석하고 내린 결정을 한번에 전송
    */
   decide(decision) {
     return this._send('ai_decision', decision);
   }
 
-  // === 공간 이동 API (OpenClaw이 컴퓨터를 "집"처럼 돌아다님) ===
+  // === 공간 이동 API (펫이 컴퓨터를 "집"처럼 돌아다님) ===
 
   /** 특정 위치로 점프 */
   jumpTo(x, y) {
@@ -270,6 +270,11 @@ class OpenClawConnector extends EventEmitter {
     return this._send('reset_character', {});
   }
 
+  /** 인격체 전환 (Incarnation 모드에서 봇 인격 반영) */
+  setPersona(data) {
+    return this._send('set_persona', data);
+  }
+
   /**
    * 현재 펫 상태 요청 (Promise 반환)
    * 서버에서 state_response가 오면 resolve, 타임아웃 시 캐시된 상태 반환
@@ -319,4 +324,4 @@ class OpenClawConnector extends EventEmitter {
   }
 }
 
-module.exports = { OpenClawConnector };
+module.exports = { ClawMateConnector };

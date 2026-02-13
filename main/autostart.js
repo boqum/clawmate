@@ -5,8 +5,8 @@
  * macOS: LaunchAgent plist
  * Linux: ~/.config/autostart/ 디렉토리에 .desktop 파일 생성
  *
- * OpenClaw이 나중에 켜져도, ClawMate는 이미 돌고 있어서 바로 연결됨.
- * ClawMate가 먼저 혼자 자율 모드로 돌다가 → OpenClaw 연결되면 AI 모드 전환.
+ * AI가 나중에 켜져도, ClawMate는 이미 돌고 있어서 바로 연결됨.
+ * ClawMate가 먼저 혼자 자율 모드로 돌다가 → AI 연결되면 AI 모드 전환.
  */
 const { app } = require('electron');
 const fs = require('fs');
@@ -22,7 +22,7 @@ function getDesktopFileContent() {
     '[Desktop Entry]',
     'Type=Application',
     'Name=ClawMate',
-    'Comment=OpenClaw Desktop Pet',
+    'Comment=ClawMate Desktop Pet',
     `Exec=${process.execPath} ${path.resolve(__dirname, '..')}`,
     'X-GNOME-Autostart-enabled=true',
     'Hidden=false',

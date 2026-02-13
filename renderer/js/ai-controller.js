@@ -1,10 +1,10 @@
 /**
  * AI 행동 컨트롤러
  *
- * OpenClaw이 연결되면 → AI가 모든 행동을 결정
- * OpenClaw이 끊기면  → 자율 모드 (기존 FSM) 로 폴백
+ * AI가 연결되면 → AI가 모든 행동을 결정
+ * AI가 끊기면  → 자율 모드 (기존 FSM) 로 폴백
  *
- * OpenClaw AI가 결정하는 것:
+ * AI가 결정하는 것:
  * - 언제 뭐라고 말할지
  * - 어디로 움직일지
  * - 어떤 감정을 표현할지
@@ -32,7 +32,7 @@ const AIController = (() => {
       window.clawmate.onAIConnected(() => {
         connected = true;
         autonomousMode = false;
-        Speech.show('OpenClaw 연결됨... 의식이 깨어난다.');
+        Speech.show('AI 연결됨... 의식이 깨어난다.');
         StateMachine.forceState('excited');
       });
     }
@@ -47,7 +47,7 @@ const AIController = (() => {
   }
 
   /**
-   * OpenClaw AI로부터 온 명령 실행
+   * AI로부터 온 명령 실행
    */
   function handleAICommand(command) {
     const { type, payload } = command;
@@ -144,7 +144,7 @@ const AIController = (() => {
       // === 커스텀 이동 패턴 ===
 
       case 'register_movement':
-        // OpenClaw이 JSON으로 이동 패턴 정의를 보내면 등록
+        // AI가 JSON으로 이동 패턴 정의를 보내면 등록
         // payload: { name, definition }
         // definition: { type, params } — 각 타입별 파라미터
         _registerAIMovement(payload.name, payload.definition);
@@ -198,6 +198,17 @@ const AIController = (() => {
         Character.resetCharacter();
         Speech.show('원래 모습으로 돌아왔어!');
         StateMachine.forceState('excited');
+        break;
+
+      // === 인격체 전환 (Incarnation 모드) ===
+      case 'set_persona':
+        // 봇 인격체 데이터 적용
+        if (typeof ModeManager !== 'undefined') {
+          ModeManager.setPersona(payload);
+          const name = payload.name || 'Claw';
+          Speech.show(`${name}의 인격이 깨어났다.`);
+          StateMachine.forceState('excited');
+        }
         break;
 
       // === 스마트 파일 조작 애니메이션 ===
@@ -290,7 +301,7 @@ const AIController = (() => {
   }
 
   /**
-   * OpenClaw AI가 JSON으로 정의한 이동 패턴을 동적으로 등록
+   * AI가 JSON으로 정의한 이동 패턴을 동적으로 등록
    * 안전한 실행을 위해 Function 생성자 대신 사전정의된 행동 유형 조합 사용
    *
    * definition 형식:
@@ -439,7 +450,7 @@ const AIController = (() => {
 
   /**
    * AI 종합 의사결정 실행
-   * OpenClaw이 상황을 분석하고 내린 복합적 결정
+   * AI가 상황을 분석하고 내린 복합적 결정
    *
    * 예시:
    * {
@@ -496,7 +507,7 @@ const AIController = (() => {
     StateMachine.forceState(state);
   }
 
-  // === 사용자 이벤트 → OpenClaw에 리포트 ===
+  // === 사용자 이벤트 → AI에 리포트 ===
 
   function reportClick(position) {
     if (window.clawmate.reportToAI) {

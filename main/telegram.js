@@ -196,13 +196,46 @@ class TelegramBot extends EventEmitter {
         // 캐릭터 변경 명령 → AI 생성 요청
         await this._handleCharacterChange(chatId, command.concept);
         break;
+
+      case 'mode_change':
+        // 모드 변경 명령
+        this._sendToBridge('set_mode', { mode: command.mode });
+        const modeNames = { pet: 'Pet (Clawby)', incarnation: 'Incarnation (Claw)', both: '둘 다' };
+        await this.bot.sendMessage(chatId, `모드 변경: ${modeNames[command.mode] || command.mode}`);
+        break;
+
+      case 'preset_character': {
+        // 캐릭터 프리셋 선택
+        const presets = {
+          default: { name: '기본 Claw', colorMap: { primary: '#ff4f40', secondary: '#ff775f', dark: '#8B4513', eye: '#ffffff', pupil: '#111111', claw: '#ff4f40' } },
+          blue: { name: '파란 Claw', colorMap: { primary: '#4488ff', secondary: '#6699ff', dark: '#223388', eye: '#ffffff', pupil: '#111111', claw: '#4488ff' } },
+          green: { name: '초록 Claw', colorMap: { primary: '#44cc44', secondary: '#66dd66', dark: '#226622', eye: '#ffffff', pupil: '#111111', claw: '#44cc44' } },
+          purple: { name: '보라 Claw', colorMap: { primary: '#8844cc', secondary: '#aa66dd', dark: '#442266', eye: '#ffffff', pupil: '#111111', claw: '#8844cc' } },
+          gold: { name: '골드 Claw', colorMap: { primary: '#ffcc00', secondary: '#ffdd44', dark: '#886600', eye: '#ffffff', pupil: '#111111', claw: '#ffcc00' } },
+          pink: { name: '핑크 Claw', colorMap: { primary: '#ff69b4', secondary: '#ff8cc4', dark: '#8B3060', eye: '#ffffff', pupil: '#111111', claw: '#ff69b4' } },
+          cat: { name: '고양이', colorMap: { primary: '#ff9944', secondary: '#ffbb66', dark: '#663300', eye: '#88ff88', pupil: '#111111', claw: '#ff9944' } },
+          robot: { name: '로봇', colorMap: { primary: '#888888', secondary: '#aaaaaa', dark: '#444444', eye: '#66aaff', pupil: '#0044aa', claw: '#66aaff' } },
+          ghost: { name: '유령', colorMap: { primary: '#ccccff', secondary: '#eeeeff', dark: '#6666aa', eye: '#ff6666', pupil: '#cc0000', claw: '#ccccff' } },
+          dragon: { name: '드래곤', colorMap: { primary: '#cc2222', secondary: '#ff4444', dark: '#661111', eye: '#ffaa00', pupil: '#111111', claw: '#ffaa00' } },
+        };
+        const preset = presets[command.preset];
+        if (preset) {
+          if (command.preset === 'default') {
+            this._sendToBridge('reset_character', {});
+          } else {
+            this._sendToBridge('set_character', { colorMap: preset.colorMap, speech: `${preset.name}(으)로 변신!` });
+          }
+          await this.bot.sendMessage(chatId, `캐릭터 변경: ${preset.name}`);
+        }
+        break;
+      }
     }
   }
 
   /**
    * 캐릭터 변경 요청 처리
    *
-   * 컨셉 텍스트를 AI(OpenClaw 플러그인)에 전달하여
+   * 컨셉 텍스트를 AI에 전달하여
    * 색상 + 프레임 데이터를 생성하고 펫에 적용.
    *
    * AI가 없으면 컨셉에서 색상만 추출하여 기본 변환.
@@ -210,14 +243,14 @@ class TelegramBot extends EventEmitter {
   async _handleCharacterChange(chatId, concept) {
     await this.bot.sendMessage(chatId, `"${concept}" 캐릭터 생성 중...`);
 
-    // AI Bridge를 통해 OpenClaw 플러그인에 캐릭터 생성 요청
+    // AI Bridge를 통해 AI에 캐릭터 생성 요청
     this._sendToBridge('ai_decision', {
       speech: `${concept}(으)로 변신 준비 중...`,
       emotion: 'curious',
       action: 'excited',
     });
 
-    // user_event로 캐릭터 변경 요청 전달 (OpenClaw 플러그인이 AI로 생성)
+    // user_event로 캐릭터 변경 요청 전달 (AI가 생성)
     if (this.bridge) {
       this.bridge.send('user_event', {
         event: 'character_request',

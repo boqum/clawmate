@@ -42,9 +42,9 @@ contextBridge.exposeInMainWorld('clawmate', {
     ipcRenderer.on('config-changed', (_, config) => callback(config));
   },
 
-  // === OpenClaw AI 통신 ===
+  // === AI 통신 ===
 
-  // AI 명령 수신 (OpenClaw → 펫)
+  // AI 명령 수신 (AI → 펫)
   onAICommand: (callback) => {
     ipcRenderer.on('ai-command', (_, command) => callback(command));
   },
@@ -57,13 +57,13 @@ contextBridge.exposeInMainWorld('clawmate', {
     ipcRenderer.on('ai-disconnected', () => callback());
   },
 
-  // 사용자 이벤트를 OpenClaw에 전달 (펫 → OpenClaw)
+  // 사용자 이벤트를 AI에 전달 (펫 → AI)
   reportToAI: (event, data) => ipcRenderer.send('report-to-ai', event, data),
 
   // AI 연결 상태 확인
   isAIConnected: () => ipcRenderer.invoke('is-ai-connected'),
 
-  // 메트릭 보고 (렌더러 → main → OpenClaw)
+  // 메트릭 보고 (렌더러 → main → AI)
   reportMetrics: (summary) => ipcRenderer.send('report-metrics', summary),
 
   // 활성 윈도우 제목 조회 (브라우저 감시)

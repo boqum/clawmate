@@ -297,20 +297,55 @@ function parseCharacterCommand(text) {
  * @param {string} text - 사용자 메시지
  * @returns {{ type: string, ... }}
  */
+/**
+ * 모드/설정 변경 명령 감지
+ * @param {string} text - 사용자 메시지
+ * @returns {{ type: 'mode_change', mode: string }|{ type: 'setting', key, value }|null}
+ */
+function parseSettingCommand(text) {
+  if (!text) return null;
+  const t = text.trim().toLowerCase();
+
+  // 모드 변경
+  if (/(?:펫|pet)\s*모드/.test(t)) return { type: 'mode_change', mode: 'pet' };
+  if (/(?:인카|인격|incarnation|claw)\s*모드/.test(t)) return { type: 'mode_change', mode: 'incarnation' };
+  if (/둘\s*다\s*모드|both\s*mode/i.test(t)) return { type: 'mode_change', mode: 'both' };
+
+  // 캐릭터 프리셋 선택 (트레이 프리셋과 동일)
+  const presetMap = {
+    '파란|파랑|blue': 'blue', '초록|green': 'green', '보라|purple': 'purple',
+    '골드|금색|gold': 'gold', '핑크|pink': 'pink',
+    '고양이|cat': 'cat', '로봇|robot': 'robot', '유령|ghost': 'ghost', '드래곤|dragon': 'dragon',
+    '기본|default|원래': 'default',
+  };
+  for (const [pattern, preset] of Object.entries(presetMap)) {
+    const regex = new RegExp(`(?:${pattern})\\s*(?:캐릭터|색|색상|으로)?\\s*(?:바꿔|변경|골라|선택|해줘)?`);
+    if (regex.test(t)) {
+      return { type: 'preset_character', preset };
+    }
+  }
+
+  return null;
+}
+
 function parseMessage(text) {
-  // 0순위: 캐릭터 변경 명령
+  // 0순위: 설정/모드 변경 명령
+  const settingCmd = parseSettingCommand(text);
+  if (settingCmd) return settingCmd;
+
+  // 1순위: 캐릭터 변경 명령 (AI 생성)
   const charCmd = parseCharacterCommand(text);
   if (charCmd) return charCmd;
 
-  // 1순위: 파일 조작 명령
+  // 2순위: 파일 조작 명령
   const fileCmd = parseFileCommand(text);
   if (fileCmd) return fileCmd;
 
-  // 2순위: 행동 명령
+  // 3순위: 행동 명령
   const actionCmd = parseActionCommand(text);
   if (actionCmd) return actionCmd;
 
-  // 3순위: 일반 대화 (speak)
+  // 4순위: 일반 대화 (speak)
   return { type: 'speak', text };
 }
 
@@ -319,6 +354,7 @@ module.exports = {
   parseFileCommand,
   parseActionCommand,
   parseCharacterCommand,
+  parseSettingCommand,
   resolveSource,
   AUTO_CATEGORIES,
 };

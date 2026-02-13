@@ -82,7 +82,7 @@ const BrowserWatcher = (() => {
   /**
    * AI에 브라우징 컨텍스트 전송
    * 제목 + 커서 위치 + 화면 캡처를 한번에 전송
-   * AI(OpenClaw 플러그인)가 분석하고 코멘트 생성
+   * AI가 분석하고 코멘트 생성
    */
   async function reportBrowsingToAI(title, category, titleChanged) {
     if (!window.clawmate.reportToAI) return;

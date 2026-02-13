@@ -2,12 +2,12 @@
  * ClawMate 렌더러 초기화
  *
  * 아키텍처:
- *   OpenClaw AI (뇌) ←→ AI Bridge (WebSocket) ←→ AI Controller (렌더러)
+ *   AI (뇌) ←→ AI Bridge (WebSocket) ←→ AI Controller (렌더러)
  *                                                       ↓
  *                                          StateMachine / PetEngine / Speech
  *
- * OpenClaw 연결 시: AI가 모든 행동/말/감정 결정
- * OpenClaw 미연결 시: 자율 모드 (FSM 기반) 로 혼자 놀기
+ * AI 연결 시: AI가 모든 행동/말/감정 결정
+ * AI 미연결 시: 자율 모드 (FSM 기반) 로 혼자 놀기
  */
 (async function initClawMate() {
   const petContainer = document.getElementById('pet-container');
@@ -45,7 +45,10 @@
       Interactions.spawnStarEffect();
     }
 
-    // 상태 변화를 OpenClaw에 리포트
+    // 모션 히스토리 기록
+    Memory.recordMotion(newState);
+
+    // 상태 변화를 AI에 리포트
     if (window.clawmate.reportToAI) {
       window.clawmate.reportToAI('state_change', {
         from: prevState, to: newState,
@@ -62,7 +65,7 @@
   // 메모리 초기화 (진화 상태 포함)
   await Memory.init();
 
-  // AI 컨트롤러 초기화 (OpenClaw 연결 관리)
+  // AI 컨트롤러 초기화 (AI 연결 관리)
   AIController.init();
 
   // 상호작용 초기화
@@ -92,7 +95,7 @@
   // AI 연결 상태 표시
   const connected = await window.clawmate.isAIConnected();
   if (connected) {
-    Speech.show('OpenClaw과 연결됨. 지시를 기다리는 중...');
+    Speech.show('AI와 연결됨. 지시를 기다리는 중...');
   } else {
     Speech.show('안녕! 나 혼자서도 잘 놀 수 있어!');
   }

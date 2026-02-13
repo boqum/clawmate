@@ -1,4 +1,4 @@
-appId: dev.openclaw.clawmate
+appId: dev.clawmate.app
 productName: ClawMate
 directories:
   output: dist

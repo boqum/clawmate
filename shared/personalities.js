@@ -16,7 +16,7 @@ const PERSONALITIES = {
     sleepResistance: 0.2,       // 수면 저항 (낮음=잘 잠)
   },
   incarnation: {
-    name: 'OpenClaw',
+    name: 'Claw',
     title: '육체를 얻은 존재',
     playfulness: 0.3,
     shyness: 0.1,
@@ -27,6 +27,40 @@ const PERSONALITIES = {
     sleepResistance: 0.6,
   },
 };
+
+/**
+ * 동적 인격체 (Incarnation 모드에서 봇의 인격을 반영)
+ *
+ * 사용자가 여러 봇을 쓸 때, 현재 포커싱된 채팅의 봇 인격체가 반영됨.
+ * set_persona 명령으로 동적 업데이트 가능.
+ */
+let activePersona = null;
+
+function setActivePersona(persona) {
+  activePersona = {
+    name: persona.name || 'Claw',
+    title: persona.title || '육체를 얻은 존재',
+    personality: persona.personality || '',   // "침착하고 논리적인", "활발하고 유머러스한"
+    speakingStyle: persona.speakingStyle || '', // "존댓말", "반말", "도도한"
+    color: persona.color || null,             // { primary, secondary, eye } 커스텀 색상
+    playfulness: persona.playfulness ?? 0.3,
+    shyness: persona.shyness ?? 0.1,
+    boldness: persona.boldness ?? 0.9,
+    speedMultiplier: persona.speedMultiplier ?? 1.0,
+    idleChatterChance: persona.idleChatterChance ?? 0.08,
+    greetings: persona.greetings || [],       // 커스텀 인사말 목록
+    catchphrases: persona.catchphrases || [], // 특징적 말버릇
+  };
+  return activePersona;
+}
+
+function getActivePersona() {
+  return activePersona;
+}
+
+function clearActivePersona() {
+  activePersona = null;
+}
 
 /**
  * 진화 단계별 외형 변화 파라미터
@@ -101,6 +135,7 @@ const EVOLUTION_STAGES = {
 if (typeof window !== 'undefined') {
   window._personalities = PERSONALITIES;
   window._evolutionStages = EVOLUTION_STAGES;
+  window._persona = { setActivePersona, getActivePersona, clearActivePersona };
 } else if (typeof module !== 'undefined') {
-  module.exports = { PERSONALITIES, EVOLUTION_STAGES };
+  module.exports = { PERSONALITIES, EVOLUTION_STAGES, setActivePersona, getActivePersona, clearActivePersona };
 }

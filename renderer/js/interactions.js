@@ -1,7 +1,7 @@
 /**
  * 마우스/클릭/드래그 상호작용 시스템
  *
- * AI 연결 시: 이벤트를 OpenClaw에 전달 → AI가 반응 결정
+ * AI 연결 시: 이벤트를 AI에 전달 → AI가 반응 결정
  * AI 미연결 시: 자율 반응 (랜덤 FSM)
  */
 const Interactions = (() => {
@@ -53,6 +53,8 @@ const Interactions = (() => {
     clickTimer = setTimeout(() => {
       if (clickCount >= 3) {
         onTripleClick();
+      } else if (clickCount === 2) {
+        onDoubleClick();
       } else if (clickCount === 1) {
         onSingleClick();
       }
@@ -100,17 +102,23 @@ const Interactions = (() => {
     PetEngine.start();
     window.clawmate.setClickThrough(true);
 
-    // AI에 드래그 이벤트 리포트
+    // AI에 드래그 이벤트 리포트 + 반응 기록
     if (dragStartPos) {
+      const draggedAction = StateMachine.getState();
+      Memory.recordReaction(draggedAction, 'drag');
       AIController.reportDrag(dragStartPos, endPos);
     }
   }
 
   function onSingleClick() {
     const pos = PetEngine.getPosition();
+    const currentAction = StateMachine.getState();
 
     // AI에 클릭 이벤트 리포트
     AIController.reportClick(pos);
+
+    // 유저 반응 기록 — 현재 행동 중 클릭 = 긍정 반응
+    Memory.recordReaction(currentAction, 'click');
 
     // AI 연결 시: AI가 반응 결정 (아무것도 안 함, AI 응답 대기)
     // AI 미연결 시: 자율 반응
@@ -123,7 +131,38 @@ const Interactions = (() => {
     spawnHeartEffect();
   }
 
+  function onDoubleClick() {
+    const pos = PetEngine.getPosition();
+    const currentAction = StateMachine.getState();
+
+    // 유저 반응 기록
+    Memory.recordReaction(currentAction, 'double_click');
+
+    // AI에 더블클릭 리포트
+    if (window.clawmate.reportToAI) {
+      window.clawmate.reportToAI('double_click', { position: pos });
+    }
+
+    // 자율 모드: 더블클릭 = 특별 반응 (점프 + 기분좋음)
+    if (AIController.isAutonomous()) {
+      StateMachine.forceState('excited');
+      PetEngine.jumpTo(
+        pos.x + (Math.random() - 0.5) * 200,
+        Math.max(100, pos.y - 150)
+      );
+      Speech.show('우와! 더블클릭이다!');
+    }
+
+    Memory.recordClick();
+    Memory.recordClick(); // 더블클릭 = 2회 클릭
+    spawnHeartEffect();
+    spawnStarEffect();
+  }
+
   function onTripleClick() {
+    const currentAction = StateMachine.getState();
+    Memory.recordReaction(currentAction, 'triple_click');
+
     if (typeof ModeManager !== 'undefined') {
       ModeManager.toggle();
     }
@@ -139,6 +178,10 @@ const Interactions = (() => {
     const dist = Math.hypot(e.clientX - (pos.x + 32), e.clientY - (pos.y + 32));
 
     if (dist < 100) {
+      // 유저 반응 기록 — 커서 접근 = 관심 표현
+      const curAction = StateMachine.getState();
+      Memory.recordReaction(curAction, 'cursor_near');
+
       // AI에 커서 접근 리포트
       AIController.reportCursorNear(dist);
 

@@ -1,7 +1,7 @@
 /**
  * 펫 동작 품질 실시간 계측기 (Self-Observation System)
  *
- * OpenClaw이 자신의 동작 품질을 관찰하고 계량할 수 있도록
+ * ClawMate가 자신의 동작 품질을 관찰하고 계량할 수 있도록
  * 렌더러 측에서 다양한 메트릭을 수집하여 main process로 전송한다.
  *
  * 수집 메트릭:
@@ -290,7 +290,7 @@ const Metrics = (() => {
       }
     }
 
-    // OpenClaw에 상태 변화 리포트
+    // AI에 상태 변화 리포트
     if (window.clawmate && window.clawmate.reportToAI) {
       window.clawmate.reportToAI('state_change', {
         from: prevState, to: newState,

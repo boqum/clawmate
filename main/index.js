@@ -69,18 +69,18 @@ function createLauncherWindow() {
 }
 
 /**
- * AI Bridge 시작 — OpenClaw 에이전트가 접속하면 펫을 조종
+ * AI Bridge 시작 — AI 에이전트가 접속하면 펫을 조종
  */
 function startAIBridge(win) {
   aiBridge = new AIBridge();
   aiBridge.start();
 
-  // OpenClaw → ClawMate 명령을 렌더러에 전달
+  // AI → ClawMate 명령을 렌더러에 전달
   const commandTypes = [
     'action', 'move', 'emote', 'speak', 'think',
     'carry_file', 'drop_file', 'set_mode', 'evolve',
     'accessorize', 'ai_decision',
-    // 공간 이동 명령 (OpenClaw이 집처럼 돌아다니기)
+    // 공간 이동 명령 (펫이 집처럼 돌아다니기)
     'jump_to', 'rappel', 'release_thread', 'move_to_center', 'walk_on_window',
     // 커스텀 이동 패턴
     'register_movement', 'custom_move', 'stop_custom_move', 'list_movements',
@@ -88,6 +88,8 @@ function startAIBridge(win) {
     'smart_file_op',
     // 캐릭터 커스터마이징 (텔레그램에서 AI 생성)
     'set_character', 'reset_character',
+    // 인격체 전환 (Incarnation 모드)
+    'set_persona',
   ];
 
   commandTypes.forEach((type) => {
@@ -98,7 +100,7 @@ function startAIBridge(win) {
     });
   });
 
-  // OpenClaw 윈도우 위치 정보 요청 처리
+  // AI 윈도우 위치 정보 요청 처리
   aiBridge.on('query_windows', async () => {
     try {
       const { getWindowPositions } = require('./platform');
@@ -110,7 +112,7 @@ function startAIBridge(win) {
     }
   });
 
-  // OpenClaw 화면 캡처 요청 처리 (main process에서 직접 캡처)
+  // AI 화면 캡처 요청 처리 (main process에서 직접 캡처)
   aiBridge.on('query_screen', async () => {
     try {
       const primaryDisplay = screen.getPrimaryDisplay();

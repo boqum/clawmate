@@ -34,7 +34,7 @@
       "type": "string",
       "enum": ["pet", "incarnation"],
       "default": "pet",
-      "description": "시작 모드 (pet: Clawby, incarnation: OpenClaw)"
+      "description": "시작 모드 (pet: Clawby, incarnation: Claw)"
     }
   }
 }

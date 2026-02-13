@@ -1,7 +1,7 @@
 {
   "id": "clawmate",
   "name": "ClawMate",
-  "description": "OpenClaw 데스크톱 펫 - 화면 위의 살아있는 Claw",
+  "description": "ClawMate - 화면 위의 살아있는 데스크톱 펫",
   "version": "1.0.0",
   "skills": ["skills/launch-pet"],
   "configSchema": {
