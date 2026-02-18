@@ -119,7 +119,7 @@ function createClawIcon() {
   return nativeImage.createFromBuffer(buf, { width: size, height: size });
 }
 
-function setupTray(mainWindow, bridge, getProactiveMonitor) {
+function setupTray(mainWindow, bridge, getProactiveMonitor, aiConfig = null) {
   aiBridge = bridge;
   const store = new Store('clawmate-config', {
     mode: 'pet',
@@ -267,6 +267,85 @@ function setupTray(mainWindow, bridge, getProactiveMonitor) {
           buildAndSet();
         },
       },
+
+      { type: 'separator' },
+
+      // === AI Brain ===
+      ...(aiConfig ? [{
+        label: '🧠 AI Brain',
+        submenu: [
+          {
+            label: aiConfig.isActive() ? '✓ Active' : (aiConfig.isConfigured() ? '✗ Paused (budget)' : '✗ No API Key'),
+            enabled: false,
+          },
+          {
+            label: 'Set API Key...',
+            click: async () => {
+              const result = await dialog.showMessageBox({
+                type: 'question',
+                buttons: ['Paste from Clipboard', 'Cancel'],
+                title: 'ClawMate AI Brain',
+                message: 'Anthropic API Key 설정',
+                detail: 'API 키를 클립보드에 복사한 후 "Paste from Clipboard"를 클릭하세요.\nhttps://console.anthropic.com/settings/keys',
+              });
+              if (result.response === 0) {
+                const key = clipboard.readText().trim();
+                if (key && key.startsWith('sk-')) {
+                  aiConfig.setApiKey(key);
+                  buildAndSet();
+                  if (mainWindow && !mainWindow.isDestroyed()) {
+                    mainWindow.webContents.send('ai-command', {
+                      type: 'speak',
+                      payload: { text: 'AI Brain 활성화! 이제 혼자서도 생각할 수 있어~' },
+                    });
+                  }
+                } else {
+                  await dialog.showMessageBox({
+                    type: 'error',
+                    buttons: ['OK'],
+                    title: 'Invalid API Key',
+                    message: 'Anthropic API 키가 아닙니다.',
+                    detail: '"sk-ant-..." 형식이어야 합니다.',
+                  });
+                }
+              }
+            },
+          },
+          {
+            label: 'Remove API Key',
+            enabled: aiConfig.isConfigured(),
+            click: () => {
+              aiConfig.setApiKey('');
+              buildAndSet();
+            },
+          },
+          { type: 'separator' },
+          {
+            label: 'Model',
+            submenu: [
+              { label: 'Auto (Recommended)', type: 'radio', checked: (aiConfig.get('model') || 'auto') === 'auto', click: () => { aiConfig.set('model', 'auto'); buildAndSet(); } },
+              { label: 'Haiku (Fast/Cheap)', type: 'radio', checked: aiConfig.get('model') === 'haiku', click: () => { aiConfig.set('model', 'haiku'); buildAndSet(); } },
+              { label: 'Sonnet (Smart)', type: 'radio', checked: aiConfig.get('model') === 'sonnet', click: () => { aiConfig.set('model', 'sonnet'); buildAndSet(); } },
+            ],
+          },
+          { type: 'separator' },
+          {
+            label: `Today: $${(aiConfig.get('todayCost') || 0).toFixed(3)} / $${(aiConfig.get('dailyBudget') || 0.50).toFixed(2)}`,
+            enabled: false,
+          },
+          {
+            label: `Month: $${(aiConfig.get('monthCost') || 0).toFixed(3)} / $${(aiConfig.get('monthlyBudget') || 5.00).toFixed(2)}`,
+            enabled: false,
+          },
+          { type: 'separator' },
+          {
+            label: 'Telegram AI Chat',
+            type: 'checkbox',
+            checked: aiConfig.get('telegramAI') !== false,
+            click: (item) => { aiConfig.set('telegramAI', item.checked); },
+          },
+        ],
+      }] : []),
 
       { type: 'separator' },
 

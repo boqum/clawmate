@@ -17,7 +17,7 @@ const memoryStore = new Store('clawmate-memory', {
   milestones: [],
 });
 
-function registerIpcHandlers(getMainWindow, getAIBridge, getProactiveMonitor) {
+function registerIpcHandlers(getMainWindow, getAIBridge, getProactiveMonitor, aiConfig = null, aiBrain = null) {
   // Click-through control
   ipcMain.on('set-click-through', (event, ignore) => {
     const win = getMainWindow();
@@ -261,6 +261,22 @@ function registerIpcHandlers(getMainWindow, getAIBridge, getProactiveMonitor) {
     }
     store.set('proactiveEnabled', enabled);
     return enabled;
+  });
+
+  // === AI Brain IPC ===
+
+  ipcMain.handle('get-ai-config', () => {
+    return aiConfig ? aiConfig.getAll() : null;
+  });
+
+  ipcMain.handle('set-ai-config', (_, key, value) => {
+    if (!aiConfig) return false;
+    aiConfig.set(key, value);
+    return true;
+  });
+
+  ipcMain.handle('get-ai-status', () => {
+    return aiBrain ? aiBrain.getStatus() : null;
   });
 }
 

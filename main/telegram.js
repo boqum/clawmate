@@ -35,6 +35,7 @@ class TelegramBot extends EventEmitter {
   constructor(bridge, options = {}) {
     super();
     this.bridge = bridge;
+    this.aiBrain = options.aiBrain || null;
     this.bot = null;
     this.active = false;
     this.allowedChatIds = options.allowedChatIds || null;
@@ -173,7 +174,27 @@ class TelegramBot extends EventEmitter {
   async _executeCommand(chatId, command) {
     switch (command.type) {
       case 'speak':
-        // Normal conversation -> display in pet speech bubble
+        // AI Brain handles conversation if available
+        if (this.aiBrain?.isActive) {
+          try {
+            const aiResponse = await this.aiBrain.callAPI(
+              [{ role: 'user', content: command.text }],
+              { importance: 'high', maxTokens: 200 }
+            );
+            const parsed = this.aiBrain._parseResponse(aiResponse);
+            if (parsed?.speech) {
+              await this.bot.sendMessage(chatId, `🦞 ${parsed.speech}`);
+              this._sendToBridge('speak', { text: parsed.speech, style: 'normal' });
+              if (parsed.action) this._sendToBridge('action', { state: parsed.action });
+              if (parsed.emotion) this._sendToBridge('emote', { emotion: parsed.emotion });
+              break;
+            }
+          } catch (err) {
+            console.error('[Telegram] AI Brain response failed:', err.message);
+            // Fall through to default behavior
+          }
+        }
+        // Fallback: display message as-is
         this._sendToBridge('speak', { text: command.text, style: 'normal' });
         this._sendToBridge('ai_decision', {
           speech: command.text,

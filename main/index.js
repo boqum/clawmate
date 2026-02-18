@@ -5,12 +5,20 @@ const { registerIpcHandlers } = require('./ipc-handlers');
 const { AIBridge } = require('./ai-bridge');
 const { TelegramBot } = require('./telegram');
 const { ProactiveMonitor } = require('./proactive-monitor');
+const { AIConfig } = require('./ai-config');
+const { AIMemory } = require('./ai-memory');
+const { AIBrain } = require('./ai-brain');
+const { AIBrainTriggers } = require('./ai-brain-triggers');
 
 let mainWindow = null;
 let launcherWindow = null;
 let aiBridge = null;
 let telegramBot = null;
 let proactiveMonitor = null;
+let aiConfig = null;
+let aiMemory = null;
+let aiBrain = null;
+let aiBrainTriggers = null;
 
 function createMainWindow() {
   const { width, height } = screen.getPrimaryDisplay().workAreaSize;
@@ -156,20 +164,64 @@ function startAIBridge(win) {
 }
 
 app.whenReady().then(() => {
-  registerIpcHandlers(() => mainWindow, () => aiBridge, () => proactiveMonitor);
+  // AI Brain initialization
+  aiConfig = new AIConfig();
+  aiMemory = new AIMemory();
+  aiBrain = new AIBrain(aiConfig, aiMemory);
+
+  registerIpcHandlers(() => mainWindow, () => aiBridge, () => proactiveMonitor, aiConfig, aiBrain);
   const win = createMainWindow();
   const bridge = startAIBridge(win);
-  setupTray(win, bridge, () => proactiveMonitor);
 
-  // Initialize Telegram bot (silently ignored if no token)
-  telegramBot = new TelegramBot(bridge);
+  // AI Brain Triggers (needs mainWindow)
+  aiBrainTriggers = new AIBrainTriggers(aiBrain, aiMemory, win);
 
-  // Initialize Proactive Monitor
+  // Connect screen capture to AI Brain
+  aiBrain.setCaptureScreen(async () => {
+    try {
+      const primaryDisplay = screen.getPrimaryDisplay();
+      const { width, height } = primaryDisplay.size;
+      const sources = await desktopCapturer.getSources({
+        types: ['screen'],
+        thumbnailSize: { width: Math.min(width, 960), height: Math.min(height, 540) },
+      });
+      if (sources.length > 0) {
+        const thumbnail = sources[0].thumbnail;
+        const jpegBuffer = thumbnail.toJPEG(40);
+        return {
+          image: jpegBuffer.toString('base64'),
+          width: thumbnail.getSize().width,
+          height: thumbnail.getSize().height,
+        };
+      }
+      return null;
+    } catch { return null; }
+  });
+
+  // AI Brain events → renderer (same 'ai-command' channel as AIBridge)
+  ['speak', 'think', 'action', 'emote', 'move'].forEach(type => {
+    aiBrain.on(type, (payload) => {
+      if (win && !win.isDestroyed()) {
+        win.webContents.send('ai-command', { type, payload });
+      }
+    });
+  });
+
+  // OpenClaw connection/disconnection → toggle Brain
+  bridge.on('connected', () => { aiBrain.setOpenClawConnected(true); });
+  bridge.on('disconnected', () => { aiBrain.setOpenClawConnected(false); });
+
+  setupTray(win, bridge, () => proactiveMonitor, aiConfig);
+
+  // Initialize Telegram bot with AI Brain
+  telegramBot = new TelegramBot(bridge, { aiBrain });
+
+  // Initialize Proactive Monitor with Brain Triggers
   const Store = require('./store');
   const configStore = new Store('clawmate-config', { proactiveEnabled: true });
   proactiveMonitor = new ProactiveMonitor();
   if (configStore.get('proactiveEnabled') !== false) {
-    proactiveMonitor.start(win, bridge);
+    proactiveMonitor.start(win, bridge, aiBrainTriggers);
   }
 
   // Register auto-start on first install
@@ -188,6 +240,9 @@ app.on('window-all-closed', () => {
 });
 
 app.on('before-quit', () => {
+  if (aiMemory) aiMemory.destroy();
+  if (aiBrain) aiBrain.destroy();
+  if (aiBrainTriggers) aiBrainTriggers.destroy();
   if (proactiveMonitor) proactiveMonitor.stop();
   if (telegramBot) telegramBot.stop();
   if (aiBridge) aiBridge.stop();

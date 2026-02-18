@@ -313,10 +313,14 @@ class ProactiveMonitor extends EventEmitter {
 
   /**
    * Start monitoring
+   * @param {BrowserWindow} mainWindow
+   * @param {AIBridge} aiBridge
+   * @param {AIBrainTriggers} [brainTriggers] - Optional AI Brain trigger handler
    */
-  start(mainWindow, aiBridge) {
+  start(mainWindow, aiBridge, brainTriggers = null) {
     this.mainWindow = mainWindow;
     this.aiBridge = aiBridge;
+    this.brainTriggers = brainTriggers;
     this.enabled = true;
 
     // Initialize clipboard state
@@ -932,6 +936,28 @@ class ProactiveMonitor extends EventEmitter {
       }
 
       this.aiBridge.reportProactiveEvent(triggerType, aiContext);
+    } else if (this.brainTriggers && this.brainTriggers.isActive()) {
+      // Fallback: AI Brain handles trigger when OpenClaw is not connected
+      const aiContext = {
+        ...context,
+        activeTitle: this._lastTitle,
+        activeApp: this._lastAppName,
+      };
+
+      if (VISUAL_TRIGGERS.has(triggerType)) {
+        const [screenData, cursor] = await Promise.all([
+          this._captureScreen(),
+          Promise.resolve(this._getCursorPosition()),
+        ]);
+        if (screenData) aiContext.screen = screenData;
+        if (cursor) aiContext.cursor = cursor;
+      }
+
+      this.brainTriggers.handleTrigger({
+        trigger: triggerType,
+        context: aiContext,
+        timestamp: Date.now(),
+      });
     }
 
     console.log(`[ProactiveMonitor] Fired: ${triggerType}${VISUAL_TRIGGERS.has(triggerType) ? ' (with screen)' : ''}`);
